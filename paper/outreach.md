@@ -3,7 +3,7 @@
 ## One-page summary (attach as PDF with Figure 1)
 
 **Pulled, moved, then made: how crypto order books refill after liquidity sweeps**
-Joel Pulikkan — [university], sophomore · Code: https://github.com/GamingPuzzled/Orderbook-Fluid-Dynamics
+Joel Pulikkan — Rutgers University–New Brunswick, sophomore · Code: https://github.com/GamingPuzzled/Orderbook-Fluid-Dynamics
 
 **Question.** When a large aggressive order wipes out several price levels of a limit order
 book, how does the book refill, and where does the new liquidity come from? Continuum models
@@ -50,7 +50,7 @@ the paper for submission (target: *Quantitative Finance*).
 
 Dear Professor [Name],
 
-I'm a sophomore in [major] at [university]. I have been working independently on how limit
+I'm a sophomore in [major] at Rutgers–New Brunswick. I have been working independently on how limit
 order books refill after large aggressive trades, and given your work on [specific paper or
 topic of theirs], I'd be grateful for your view on it.
 
@@ -69,7 +69,7 @@ Thank you for your time.
 
 Best regards,
 Joel Pulikkan
-[university] · joelpulikkan253@gmail.com
+Rutgers University–New Brunswick · joelpulikkan253@gmail.com
 
 ---
 
@@ -82,3 +82,29 @@ Joel Pulikkan
   closest papers in the literature review, especially those who work with students.
 - Personalise the first paragraph with one specific paper of theirs. Send to 3–5 people at a
   time, and follow up once after about 10 days.
+
+## Targets (checked 2026-11-10; confirm on each page before emailing)
+
+**Rutgers–New Brunswick (start here; an in-person meeting is easiest)**
+
+| Who | Dept | Why them | Mention |
+|---|---|---|---|
+| **Bruce Mizrach** (first choice) | Economics | Market microstructure of electronic limit order markets is his current research | "An Empirical Analysis of the Shanghai and Shenzhen Limit Order Books" (with Chung, Gao, Lu, *Economic Modelling*) |
+| Xiye Yang | Economics | High-frequency financial econometrics; organised the Rutgers High Frequency Financial Econometrics Workshop | "Testing for mutually exciting jumps and financial flights in high frequency data" (*J. Econometrics* 2018) |
+| Norman R. Swanson | Economics | Econometrics; co-edited a special issue on high-frequency financial data | the *Econometrics* special issue on high-dimensional and high-frequency data |
+| Paul Feehan | Mathematics | Mathematical finance with PDEs; directs the Mathematical Finance MS | the continuum-model (PDE) section of the paper |
+| Tavy Ronen | Finance (Rutgers Business School) | Empirical market microstructure | her microstructure work (pick one paper from her CV) |
+
+Suggested order: Mizrach first, alone. If no reply in 10 days, Yang and Feehan.
+
+**Authors of the closest papers (cite their paper in the first line; verify current affiliation)**
+
+- Michael Ludkovski (UC Santa Barbara): Bechler & Ludkovski (2017), LOB resiliency on the meso-scale; supervises students.
+- Martin D. Gould: Bonart & Gould (2017), latency and liquidity provision — the paper ours is closest to.
+- Joel Hasbrouck (NYU Stern): fleeting orders; runs the NYU microstructure meeting.
+- Gideon Saar (Cornell): fleeting orders, HFT.
+- Andreas Park (Toronto) and Katya Malinova (McMaster): quote fade, "Modern" market makers.
+- Michael Benzaquen (École Polytechnique) / Jean-Philippe Bouchaud (CFM): latent and fractional order-book models — our PDE result speaks directly to them.
+- Tim Gebbie (Cape Town): anomalous-diffusion order-book simulation.
+
+A Rutgers mentor matters most: they can also endorse an arXiv q-fin submission.
