@@ -31,7 +31,7 @@ cancelled within about 50--110\,ms; (ii) \emph{repositioning}, a depth-conservin
 reallocation in which depth cancelled deep in the book is matched by depth posted near the new
 best quote, supplying 74--93\% of the
 near-touch rebuild in the first 250\,ms while total depth on the swept side \emph{falls}
-(additions/cancellations $=0.61$--$0.74$ at 20--40\,ms against $\approx 1.0$ in matched
+(additions/cancellations $=0.61$--$0.73$ at 20--40\,ms against $\approx 1.0$ in matched
 placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred at roughly 0.4--0.5\,s.
 In out-of-sample fits of the depth profile, a local diffusion term adds no predictive power.
 The excess cost of a follow-up market order falls by about 90\% within 250\,ms, during
@@ -84,11 +84,11 @@ three ordered phases:
   \item \textbf{Repositioning} (centroid $\approx$ 130--360\,ms): depth cancelled deeper in the
         book is matched by depth posted within five ticks of the new best quote. It supplies
         74--93\% of the near-touch rebuild in the first 250\,ms, while the ratio of added to
-        cancelled depth on the swept side is 0.61--0.74 at 20--40\,ms, against 1.0--1.05 at
+        cancelled depth on the swept side is 0.61--0.73 at 20--40\,ms, against 1.0--1.05 at
         matched placebo times. The match is in aggregate flows. In the 20\,ms level-2 feed,
         exact-size tracing links only about 1\% of near-touch additions to deeper
         cancellations, but this reflects netting: in a preliminary order-level sample from
-        Bitstamp, exact-amount cancel-and-repost moves supply about a quarter of near-touch
+        Bitstamp, exact-amount cancel-and-repost moves supply about a fifth of near-touch
         added volume.
   \item \textbf{Source} (centroid $\approx$ 415--510\,ms): after roughly 140\,ms (ETH) to
         140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
@@ -127,17 +127,17 @@ incremental level updates) and \texttt{trades} (with aggressor side).
 
 \paragraph{Feed.} From May 2023 the recorded feed is Bybit's \texttt{orderbook.50} channel:
 50 levels per side pushed every 20\,ms, with a median exchange-to-receipt latency of about
-37\,ms. Earlier free days carry 25 levels and coarser ticks and are excluded from the main
-sample. Exchange timestamps in both book and trade files are monotone, so we align the two
+37\,ms. Earlier free days carry 25 levels (and, before March 2023, a 0.5 rather than 0.1 tick) and
+are excluded from the main sample. Exchange timestamps in both book and trade files are monotone, so we align the two
 streams on the exchange clock rather than on receipt time.
 
 \paragraph{Sample.} The main sample is 42 days (BTCUSDT) and 43 days (ETHUSDT) from May 2023 to
-November 2026. Table~\ref{tab:sample} summarises it.
+October 2026 (BTCUSDT) and November 2026 (ETHUSDT). Table~\ref{tab:sample} summarises it.
 
 \begin{table}[ht]
 \centering
 \caption{Sample. Sweeps: aggressor runs clearing $\geq 3$ levels with volume at or above the
-daily 95th percentile and no other large run within 500\,ms. ``Clean'': at least 95\% of the
+daily 95th percentile and no other candidate run within the preceding 500\,ms. ``Clean'': at least 95\% of the
 swept levels empty at the first post-sweep book message.}
 \label{tab:sample}
 \begin{tabular}{lrrrr}
@@ -168,9 +168,9 @@ swept-side depth at integer distance
 \end{equation}
 where $b(t)$ is the best bid and $\delta$ the tick size. A fully recovered one-tick-spread book
 has depth at $d=1$. Sell sweeps are mirrored. The frame follows the price: in a frame fixed at
-the pre-sweep mid, the opposite quote advances by a median of 57 ticks within 20\,ms (BTC),
-which is 1.5--2.5 times the width of the cleared gap, so ``refill'' in a fixed frame is
-dominated by price relocation.
+the pre-sweep mid, the opposite quote advances by a median of 57 ticks within 20\,ms (BTC), and
+by 40\,ms the mid has moved by a median of one full gap width (the cleared span, median 73
+ticks for BTC and 44 for ETH), so ``refill'' in a fixed frame is dominated by price relocation.
 
 \paragraph{Recovery.} For a set of events $E$ and a distance bucket $B$,
 \begin{equation}
@@ -197,8 +197,8 @@ source gives $\kappa>1$.
 Placebo times are drawn uniformly within each day, at least 2\,s from any large candidate run,
 with a random side. Sweeps occur in busier, more volatile markets and on thinner books, so we
 reweight placebo events within each day by coarsened exact matching on quartiles (of that day's
-sweeps) of 10\,s traded volume, 60\,s realised variation and pre-event swept-side depth. All
-sweeps lie in strata with placebo support. Matching moves placebo means most of the way to the
+sweeps) of 10\,s traded volume, 60\,s realised variation and pre-event swept-side depth.
+99.7\% (BTC) and 99.8\% (ETH) of sweeps lie in strata with placebo support. Matching moves placebo means most of the way to the
 sweep means (e.g.\ BTC 10\,s volume: sweeps 28.9, raw placebo 9.0, matched 24.9). Because
 sweeps concentrate in the open-ended top quartile, quartile strata leave a residual gap in
 pre-event depth (BTC: sweeps 19.2, matched placebo 26.7; standardised difference $+0.32$). As a
@@ -242,7 +242,7 @@ their pre-sweep depth at 40--60\,ms. The probability of a one-tick spread rises 
 
 \subsection{Mass balance: depth falls before it rises}
 Table~\ref{tab:kappa} and Figure~\ref{fig:kappa} report $\kappa$. In the first 100\,ms after a
-sweep, cancellations exceed additions on the swept side (BTC $\kappa = 0.74$ at 20--40\,ms;
+sweep, cancellations exceed additions on the swept side (BTC $\kappa = 0.73$ at 20--40\,ms;
 ETH 0.61), whereas matched placebo times show balanced churn ($\kappa \approx 1.00$--$1.07$).
 Additions exceed cancellations by more than at placebo times only from 100--250\,ms (ETH) or
 250--1000\,ms (BTC) onward.
@@ -258,7 +258,7 @@ day-cluster bootstrap intervals in brackets. Placebo: state-matched.}
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Window (ms) & Sweeps & Placebo & Sweeps & Placebo \\
 \midrule
-20--40    & 0.74 [0.68, 0.80] & 1.05 & 0.61 [0.56, 0.66] & 1.01 \\
+20--40    & 0.73 [0.68, 0.80] & 1.05 & 0.61 [0.56, 0.66] & 1.01 \\
 40--100   & 0.87 [0.82, 0.91] & 1.07 & 0.85 [0.81, 0.89] & 1.00 \\
 100--250  & 0.99 [0.95, 1.02] & 1.04 & 1.12 [1.08, 1.16] & 1.03 \\
 250--1000 & 1.11 [1.09, 1.12] & 1.04 & 1.09 [1.07, 1.11] & 1.03 \\
@@ -328,19 +328,22 @@ price, which hides moves at busy levels, and post-sweep levels are the busiest. 
 interpret repositioning as a depth-conserving reallocation in aggregate flows.
 
 Order-level data show that the low Bybit match rate reflects netting rather than the absence of
-moves. In a preliminary 5.2-hour sample of Bitstamp's public BTC/USD order feed (4.7 million
-order events, each with its own identifier and millisecond timestamp, so nothing is netted), a
-re-posted order receives a new identifier, but its amount is exact to the satoshi. Within 1\,bp
-of the opposite quote, 43\% of added volume in the second after a sweep (52\% at
-state-matched placebo times) has a cancellation of the identical amount at a strictly deeper
-price within 100\,ms. A one-satoshi-off control matches almost nothing, and a control
-that repeats the rule against cancellations 2\,s later, which absorbs market makers' habit of
-reusing quote sizes, removes about half; the remaining 24\% (95\% CI 17--31\%) after sweeps
-and 29\% (18--41\%) at placebo times are cancel-and-repost moves toward the touch. Moving
-existing orders is therefore a routine way of supplying near-touch liquidity, not a rare
-event. With only 87 sweeps, this sample cannot yet say whether moves intensify after sweeps;
-the post-sweep dip in additions relative to cancellations does replicate in direction
-($\kappa_{20\text{--}40}=0.77$, CI 0.56--1.05). \todo{Update with the full Bitstamp sample.}
+moves. In a preliminary 7.2-hour sample of Bitstamp's public BTC/USD order feed (7.5 million
+order events, each with its own identifier and millisecond timestamp, so nothing is netted),
+resting orders are never re-priced in place: price changes in \texttt{order\_changed} events
+occur only for aggressive orders as they fill. A moved order therefore appears as a
+cancellation followed by a new order, whose amount is exact to the satoshi. Within 1\,bp of the
+opposite quote, 43\% of added volume in the second after a sweep (41\% at state-matched
+placebo times) has a cancellation of the identical amount at a strictly deeper price within
+100\,ms. A one-satoshi-off control matches almost nothing, and a control that repeats the rule
+against cancellations 2\,s later, which absorbs market makers' habit of reusing quote sizes,
+removes about half; the remaining 22\% (95\% CI 16--28\%) after sweeps and 21\% (16--26\%)
+at placebo times are cancel-and-repost moves toward the touch. Moving existing orders is
+therefore a routine way of supplying near-touch liquidity, not a rare event. With only 101
+sweeps, and placebo matching that remains imperfect (standardised differences up to 0.39), this
+sample cannot yet say whether moves intensify after sweeps, and the post-sweep dip in additions
+relative to cancellations is below one but not significant ($\kappa_{20\text{--}40}=0.89$,
+CI 0.65--1.17). \todo{Update with the full Bitstamp sample.}
 
 \subsection{What a follow-up order pays}
 \label{sec:exec}
@@ -398,7 +401,7 @@ $\rho_{k+1}-\rho_k$ from $\rho_k$. All models share a cancellation term $-\nu_k\
 near-touch source $s_k\phi_\ell(d)$ with $\phi_\ell \propto e^{-(d-1)/\ell}$. The local model
 adds diffusion $D_k\,\Delta^2\rho$ and a drift $a_k\nabla\rho$ (which also absorbs the
 mechanical shift of the moving frame); the non-local model adds a mass-conserving jump
-$\kappa_k[\phi_\lambda(d)\sum_{y\geq m}\rho(y) - \mathbf{1}\{d\geq m\}\rho(d)]$ from the deep
+$\gamma_k[\phi_\lambda(d)\sum_{y\geq m}\rho(y) - \mathbf{1}\{d\geq m\}\rho(d)]$ from the deep
 book to the touch. Rates are step-specific and non-negative; shapes $(\ell,\lambda,m)$ are
 chosen on training data. Table~\ref{tab:pde} reports five-fold cross-validation by day.
 
@@ -422,7 +425,7 @@ Common (cancellation + source) & 0.653 [0.614, 0.717] & 0.389 [0.341, 0.477] \\
 
 Adding local diffusion never improves out-of-sample fit. In the full-sample fit the diffusion
 coefficient is zero in every step for BTC and at most 0.03 per step for ETH. The jump rate is
-positive only between 40 and 100\,ms (BTC $\kappa=0.09$ at 40--60\,ms; ETH 0.07 and 0.05 at
+positive only between 40 and 100\,ms (BTC $\gamma=0.09$ at 40--60\,ms; ETH 0.07 and 0.05 at
 40--60 and 60--100\,ms), when repositioning is strongest, and the non-local model improves on
 the common model for ETH (0.410 vs 0.389) but not for BTC. Profile snapshots alone identify the
 non-local jump only weakly, because a jump and a near-touch source both add mass at the touch;
@@ -453,7 +456,7 @@ on sub-second horizons.
 \citet{mastromatteo2014anomalous} treats buy and sell intentions as densities that diffuse,
 react and are injected, which yields square-root impact. \citet{benzaquen2018fractional}
 replace ordinary diffusion with a fractional, non-local operator, and \citet{diana2024anomalous}
-simulate fractional-diffusion order books. \citet{cont2021spde} model the observed book density
+simulate order books with anomalous diffusion of orders. \citet{cont2021spde} model the observed book density
 as a stochastic PDE around the mid price and calibrate it to the average profile, and
 \citet{hambly2024porous} study a stochastic porous-medium equation motivated by the order book.
 \citet{mahseredjian2025migration} derives a diffusion limit of a Hawkes-driven book in which
@@ -474,8 +477,8 @@ additions occur after a shock, which constrains how such models should couple le
 the best quotes of five Nasdaq stocks before and after market orders and identify a sequence
 of phases: platform and response latency, a high-speed reaction with net outflow at the
 same-side best quote, and then net inflow consistent with stimulated refill.
-\citet{bechler2017meso} document that liquidity providers anticipating one-sided flow cancel
-resting orders after executions (``LOB fade''). Our withdrawal and source phases extend these
+\citet{bechler2017meso} document episodes in which market orders under one-sided flow are met
+by net cancellations at the touch rather than new limit orders (``LOB fade''). Our withdrawal and source phases extend these
 best-quote patterns through the depth profile; the intermediate reallocation from deep to near
 levels has, to our knowledge, not been measured.
 
@@ -530,7 +533,7 @@ excess left at 250\,ms. \todo{Describe the additional coins and venues once proc
 \centering
 \caption{Summary by asset and venue. Sweeps: clean sweeps with valid flow windows.
 $\kappa_{20\text{--}40}$ and repositioning share as in Table~\ref{tab:robust} (NN placebo,
-fine window grid, so $\kappa$ can differ from Table~\ref{tab:kappa} in the second decimal). $\bar t_{\mathrm{W}}, \bar t_{\mathrm{R}}, \bar
+fine window grid). $\bar t_{\mathrm{W}}, \bar t_{\mathrm{R}}, \bar
 t_{\mathrm{S}}$: mass-weighted centroids (ms) of withdrawal, repositioning and new liquidity.
 Switch: first window in which additions exceed cancellations (range = bootstrap interval when
 the point estimate is not unique). $\Delta R^2_{\mathrm{diff}}$: out-of-sample $R^2$ of the
@@ -552,9 +555,9 @@ share, and the timing of the three phases (95\% day-cluster intervals).}
   \item \textbf{Level-2 data.} Without order identifiers we cannot show that the \emph{same}
         orders move; repositioning is identified from matched aggregate cancellation and
         addition flows. Bitstamp's order-level feed shows that exact-amount cancel-and-repost
-        moves supply about a quarter of near-touch added volume, but that sample is short
-        (5.2 hours, 87 sweeps), on a spot venue, and its placebo matching is imperfect
-        (standardised differences up to 0.5).
+        moves supply about a fifth of near-touch added volume, but that sample is short
+        (7.2 hours, 101 sweeps), on a spot venue, and its placebo matching is imperfect
+        (standardised differences up to 0.39).
   \item \textbf{Push netting.} Each 20\,ms message nets changes at a price, so gross flows are
         lower bounds.
   \item \textbf{Fill matching.} About one third of sweep volume exceeds the displayed size at

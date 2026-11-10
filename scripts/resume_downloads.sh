@@ -13,7 +13,7 @@ post() {  # post <exchange> <symbol> <max push ms>: fine flows -> model -> robus
   local P="--max-push-ms $3"
   $UV run lobflow flows --exchange "$1" --symbol "$2" --tag flowsfine --edges $EDGES \
     --workers 1 ${=P} >> "$LOG" 2>&1
-  $UV run lobflow model --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
+  $UV run lobflow model --exchange "$1" --symbol "$2" --n-boot 300 ${=P} > /dev/null 2>> "$LOG"
   $UV run lobflow robustness --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
   $UV run lobflow moves --exchange "$1" --symbol "$2" --workers 2 ${=P} > /dev/null 2>> "$LOG"
   $UV run lobflow pde --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"

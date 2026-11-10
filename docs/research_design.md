@@ -375,3 +375,12 @@ Withdrawal phase = multi-level "quote fade" (Malinova & Park 2016); cite as prec
   after sweeps (52% placebo); beyond the 2 s time-shift control 24% [17, 31] vs 29% [18, 41].
   ±1 satoshi control ≈ 0. Conclusion: moves are routine; post-sweep excess undetermined until
   more data (≈400 sweeps/day).
+
+Update (2026-11-10, 7.2 h / 101 sweeps): beyond-time-control moves 22% [16, 28] after sweeps vs
+21% [16, 26] placebo; κ(20–40) 0.89 [0.65, 1.17]. `order_changed` price changes are 99.9% taker
+orders filling at successive prices; resting orders are never re-priced in place (0 events), so
+delete+create is the only way a resting order moves on Bitstamp.
+Line-by-line paper audit (2026-11-10): fixed κ rounding (0.735 → 0.73), CEM coverage (99.7/99.8%,
+not 100%), relocation ≈ 1 gap width (not 1.5–2.5×; that came from a one-day diagnostic), sample
+end dates, sweep-isolation wording, jump rate renamed γ, Diana–Gebbie and Bechler–Ludkovski
+descriptions checked against the papers.

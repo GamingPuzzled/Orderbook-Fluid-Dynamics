@@ -443,7 +443,8 @@ def window_flows(
 ) -> pl.DataFrame:
     """Swept-side order events within ``window_ms`` of each anchor's ``t_end``.
 
-    Columns: aid, side, dt_ms (from t_end), kind ('add' | 'cancel' | 'fill' | 'change'), px, amt,
+    Columns: aid, side, dt_ms (from t_end), kind ('add' | 'cancel' | 'fill' | 'change' |
+    'move' = same order ID re-priced in place, ``prev_px`` = its previous price), px, amt,
     dist_bps (from the opposite best quote before the event; positive = away from it).
     A delete is a fill if the order traded as maker within 20 ms before it. Events while the
     book is crossed (transient marketable orders, ~1% of time) are dropped.
@@ -455,9 +456,24 @@ def window_flows(
         .agg(pl.col("t_us").max().alias("t_fill"))
         .rename({"maker_id": "id"})
     )
+    # previous price of the same order: an order_changed with a new price is an in-place move,
+    # unless the order is a taker (its price field follows its successive fills)
+    takers = ev.filter(pl.col("ev") == EV_TRADE)["id"].unique()
+    orders = orders.with_columns(
+        pl.when(pl.col("id").is_in(takers.implode()))
+        .then(None)
+        .otherwise(pl.col("px").shift(1).over("id"))
+        .alias("prev_px")
+    )
     orders = orders.join(last_fill, on="id", how="left").with_columns(
         pl.when(pl.col("ev") == EV_CREATE)
         .then(pl.lit("add"))
+        .when(
+            (pl.col("ev") == EV_CHANGE)
+            & pl.col("prev_px").is_not_null()
+            & (pl.col("px") != pl.col("prev_px"))
+        )
+        .then(pl.lit("move"))
         .when(pl.col("ev") == EV_CHANGE)
         .then(pl.lit("change"))
         .when(pl.col("t_fill").is_not_null() & (pl.col("t_us") - pl.col("t_fill") <= 20_000))
@@ -488,7 +504,7 @@ def window_flows(
     idx = np.concatenate(idx_parts)
     return (
         orders[idx]
-        .select("t_us", "id", "side", "kind", "px", "amt", "dist_bps")
+        .select("t_us", "id", "side", "kind", "px", "prev_px", "amt", "dist_bps")
         .with_columns(
             pl.Series("aid", np.concatenate(aid_parts)),
             pl.Series("dt_ms", np.concatenate(dt_parts)),
@@ -687,6 +703,33 @@ def run_l3(
         for k, v in ext.items():
             share[g][k] = _boot_ratio(v, tot_ext, a["w"].to_numpy(), n_boot, sub)
 
+    # same-ID in-place moves into the touch: share of near-touch inflow (adds + moves in)
+    toward = (
+        pl.when(pl.col("side") == 1)
+        .then(pl.col("px") < pl.col("prev_px"))
+        .otherwise(pl.col("px") > pl.col("prev_px"))
+    )
+    near_in = early.filter(
+        (pl.col("dt_ms") >= 0)
+        & (pl.col("dist_bps") <= near_bps)
+        & ((pl.col("kind") == "add") | ((pl.col("kind") == "move") & toward))
+    )
+    n_inplace = {
+        g: int(
+            near_in.filter(pl.col("kind") == "move", pl.col("aid").is_in(a["aid"].implode())).height
+        )
+        for g, a in groups.items()
+    }
+    for g, a in groups.items():
+        na = near_in.filter(pl.col("aid").is_in(a["aid"].implode()))
+        num = _per_anchor(na.filter(pl.col("kind") == "move"), vol, mbins, a["aid"])
+        den = _per_anchor(na, vol, mbins, a["aid"])
+        num = np.column_stack([num] + [num[:, i:j].sum(1) for i, j in pooled.values()])
+        den = np.column_stack([den] + [den[:, i:j].sum(1) for i, j in pooled.values()])
+        share[g]["inplace"] = _boot_ratio(
+            num, den, a["w"].to_numpy(), n_boot, np.random.default_rng(seed + 10 + g)
+        )
+
     # balance (weighted standardised differences)
     def sdiff(c: str) -> float:
         xs = np.log1p(groups[1][c].to_numpy())
@@ -741,6 +784,23 @@ def run_l3(
             f"{fmt(s1['time'][0][j])} | {ci(*s1['beyond'], j)} | {fmt(s0['exact'][0][j])} | "
             f"{fmt(s0['time'][0][j])} | {ci(*s0['beyond'], j)} |"
         )
+    lines += [
+        "",
+        "## Same-ID in-place moves into the touch",
+        "",
+        "Resting orders re-priced in place (``order_changed`` with a new price and the same ID; "
+        "taker orders, whose price field follows their fills, excluded). "
+        f"Share of near-touch inflow volume (adds + in-place moves toward the touch, within "
+        f"{near_bps} bps) that is an in-place move. Events: sweeps {n_inplace[1]}, placebo "
+        f"{n_inplace[0]}.",
+        "",
+        "| window (ms) | sweep | placebo |",
+        "|---|---|---|",
+        *[
+            f"| {lab} | {ci(*share[1]['inplace'], j)} | {ci(*share[0]['inplace'], j)} |"
+            for j, lab in enumerate(ml)
+        ],
+    ]
     text = "\n".join(lines) + "\n"
     (results_dir / "l3.md").write_text(text)
     rows = []

@@ -24,7 +24,7 @@ cancellations and fills, which gives a mass balance of the swept side.
    fade" documented for equities by Malinova & Park.
 2. **Repositioning** (~130–360 ms): depth cancelled deep in the book is re-posted near the new
    best quote. This supplies 74–93% of the early rebuild, while total depth *falls*: added ÷
-   cancelled = 0.61–0.74, against ≈1.0 at matched placebo times.
+   cancelled = 0.61–0.73, against ≈1.0 at matched placebo times.
 3. **New liquidity** (~400–500 ms): only after ~140–300 ms do additions exceed cancellations.
 
 There is no sign of diffusion-like flow between adjacent price levels. The evidence points to
