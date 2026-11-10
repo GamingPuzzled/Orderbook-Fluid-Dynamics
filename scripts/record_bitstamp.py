@@ -56,6 +56,7 @@ class HourlyWriter:
         if self.fh is not None:
             self.fh.close()
             self.fh = None
+        self.key = ""  # force reopen on next write (same hour after a reconnect)
 
 
 def snapshot(pair: str, root: Path) -> None:
