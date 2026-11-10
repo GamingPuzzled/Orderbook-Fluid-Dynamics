@@ -3,6 +3,8 @@
 Fig 1  three-phase refill: withdrawal / transport / source rates vs time, per asset.
 Fig 2  mass balance: added ÷ cancelled (κ) per window, sweeps vs state-matched placebo.
 Fig 3  moving-frame recovery R(d, τ) heatmap (diverging around R = 1), per asset.
+Fig 5  excess cost of a follow-up market order vs delay, sweeps − matched placebo.
+PDFs are also copied to paper/figures/.
 
 Usage: uv run python scripts/figures.py [--assets BTCUSDT,ETHUSDT] [--exchange bybit]
 """
@@ -10,6 +12,7 @@ Usage: uv run python scripts/figures.py [--assets BTCUSDT,ETHUSDT] [--exchange b
 from __future__ import annotations
 
 import argparse
+import shutil
 from pathlib import Path
 
 import matplotlib as mpl
@@ -17,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+from matplotlib.figure import Figure
 
 # Reference palette (dataviz skill), light mode. Slots 1-3 validated all-pairs.
 SURFACE = "#fcfcfb"
@@ -57,7 +61,7 @@ def _style() -> None:
     )
 
 
-def _save(fig: plt.Figure, out: Path, name: str) -> None:
+def _save(fig: Figure, out: Path, name: str) -> None:
     out.mkdir(parents=True, exist_ok=True)
     for ext in ("png", "pdf"):
         fig.savefig(out / f"{name}.{ext}", dpi=200, bbox_inches="tight")
@@ -175,11 +179,43 @@ def fig_recovery(res: Path, assets: list[str], out: Path) -> None:
     assert im is not None
     cb = fig.colorbar(im, ax=list(axes), shrink=0.85, pad=0.02)
     ticks = np.array([0.25, 0.5, 1, 2])
-    cb.set_ticks(np.log2(ticks), labels=[f"{t:g}" for t in ticks])
+    cb.set_ticks(np.log2(ticks).tolist(), labels=[f"{t:g}" for t in ticks])
     cb.set_label("depth ÷ pre-sweep depth (R)")
     cb.outline.set_visible(False)
     fig.suptitle("Book depth after a sweep, relative to the moving price", y=1.03)
     _save(fig, out, "fig3_recovery_heatmap")
+
+
+def fig_execution(res: Path, assets: list[str], out: Path, q_mult: float = 0.1) -> None:
+    fig, ax = plt.subplots(figsize=(4.6, 2.9))
+    styles = ((BLUE, "-", "o"), (ORANGE, "--", "s"), (AQUA, ":", "^"))
+    for sym, (colour, ls, marker) in zip(assets, styles, strict=False):
+        p = res / sym / "execution.parquet"
+        if not p.exists():
+            continue
+        e = (
+            pl.read_parquet(p)
+            .filter((pl.col("q_mult") == q_mult) & (pl.col("stat") == "cost_bps"))
+            .filter(pl.col("tau_ms") > 0)
+            .sort("tau_ms")
+        )
+        t = e["tau_ms"].to_numpy()
+        ax.fill_between(t, e["diff_lo"].to_numpy(), e["diff_hi"].to_numpy(), color=colour,
+                        alpha=0.15, linewidth=0)  # fmt: skip
+        ax.plot(t, e["diff"].to_numpy(), color=colour, linestyle=ls, marker=marker,
+                markersize=4, label=sym)  # fmt: skip
+        ax.annotate(sym, (t[0], float(e["diff"][0])), xytext=(6, 2), textcoords="offset points",
+                    color=TEXT, fontsize=8)  # fmt: skip
+    ax.axhline(0, color=TEXT_2, linewidth=1)
+    ax.set_xscale("log")
+    ax.xaxis.set_minor_formatter(mpl.ticker.NullFormatter())
+    ax.set_xticks([20, 50, 100, 250, 500, 1000], labels=["20", "50", "100", "250", "500", "1000"])
+    ax.set_xlim(18, 1100)
+    ax.set_xlabel("delay after sweep (ms)")
+    ax.set_ylabel("excess cost vs matched placebo (bps)")
+    ax.legend(loc="upper right", fontsize=8)
+    fig.suptitle(f"Follow-up market order of {q_mult:g} × typical depth", y=1.02)
+    _save(fig, out, "fig5_execution")
 
 
 def main() -> None:
@@ -187,6 +223,7 @@ def main() -> None:
     ap.add_argument("--assets", default="BTCUSDT,ETHUSDT")
     ap.add_argument("--exchange", default="bybit")
     ap.add_argument("--out", default="figures")
+    ap.add_argument("--paper-figures", default="paper/figures")
     a = ap.parse_args()
     _style()
     res = Path("results") / a.exchange
@@ -195,7 +232,12 @@ def main() -> None:
     fig_phases(res, assets, out)
     fig_kappa(res, assets, out)
     fig_recovery(res, assets, out)
-    print(f"wrote figures to {out}/")
+    fig_execution(res, assets, out)
+    paper = Path(a.paper_figures)
+    paper.mkdir(parents=True, exist_ok=True)
+    for f in out.glob("fig[1235]_*.pdf"):
+        shutil.copy(f, paper / f.name)
+    print(f"wrote figures to {out}/ and PDFs to {paper}/")
 
 
 if __name__ == "__main__":

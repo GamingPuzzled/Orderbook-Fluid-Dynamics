@@ -345,7 +345,7 @@ the swept side at delay $\tau$, we walk the stored swept-side profile and comput
 the fill-weighted distance from the mid at $\tau$, in basis points; volume beyond 50 ticks is
 charged at 51 ticks, so costs are lower bounds. We set $Q$ to a tenth of the median placebo depth
 within 50 ticks (0.83\,BTC; 21.6\,ETH) and compare with state-matched placebo times
-(Table~\ref{tab:exec}). Just before the sweep, costs match placebo. Twenty milliseconds after
+(Table~\ref{tab:exec}, Figure~\ref{fig:exec}). Just before the sweep, costs match placebo. Twenty milliseconds after
 it, the follow-up order pays three times the placebo cost for BTC and twice for ETH, even
 though a quarter to a third of the order still falls beyond 50 ticks and is undercharged. The excess then
 decays fast: 62\% (BTC) and 78\% (ETH) of it is gone by 60\,ms and 87\% and 95\% by
@@ -365,8 +365,17 @@ value.}
 \resizebox{\textwidth}{!}{\input{tables/execution.tex}}
 \end{table}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/fig5_execution.pdf}
+\caption{Excess cost of a follow-up market order (0.1 $\times$ median placebo depth) over
+state-matched placebo times, by delay after the sweep. Shaded: 95\% day-cluster intervals.}
+\label{fig:exec}
+\end{figure}
+
 %----------------------------------------------------------------------------------------------
 \section{Implications for continuum models}
+\label{sec:pde}
 
 Write $\rho(x,t)$ for swept-side depth at distance $x$ from the opposite quote. A local
 reaction--diffusion description, $\partial_t\rho = D\,\partial_x^2\rho - \nu\rho + \lambda(x)$,
@@ -506,6 +515,33 @@ grid; 95\% day-cluster bootstrap intervals (100 replications) in brackets.}
 \label{tab:robust}
 \resizebox{\textwidth}{!}{\input{tables/robustness.tex}}
 \end{table}
+
+Table~\ref{tab:cross} and Figure~\ref{fig:cross} collect the headline statistics for every
+asset and venue in the sample: early net depletion ($\kappa_{20\text{--}40}<1$), the
+repositioning share, the three phase centroids, the switch to net new liquidity, the gain in
+out-of-sample $R^2$ from adding local diffusion, and the share of the follow-up execution
+excess left at 250\,ms. \todo{Describe the additional coins and venues once processed.}
+
+\begin{table}[ht]
+\centering
+\caption{Summary by asset and venue. $\kappa_{20\text{--}40}$ and repositioning share as in
+Table~\ref{tab:robust} (NN placebo). $\bar t_{\mathrm{W}}, \bar t_{\mathrm{R}}, \bar
+t_{\mathrm{S}}$: mass-weighted centroids (ms) of withdrawal, repositioning and new liquidity.
+Switch: first window in which additions exceed cancellations (range = bootstrap interval when
+the point estimate is not unique). $\Delta R^2_{\mathrm{diff}}$: out-of-sample $R^2$ of the
+local minus the common model (Section~\ref{sec:pde}). Exec.\ left: follow-up excess cost at
+250\,ms relative to 20\,ms (Section~\ref{sec:exec}). 95\% day-cluster intervals.}
+\label{tab:cross}
+\resizebox{\textwidth}{!}{\input{tables/crossasset.tex}}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/fig4_cross_asset.pdf}
+\caption{The three-phase refill by asset and venue: early net depletion, the repositioning
+share, and the timing of the three phases (95\% day-cluster intervals).}
+\label{fig:cross}
+\end{figure}
 
 \begin{itemize}
   \item \textbf{Level-2 data.} Without order identifiers we cannot show that the \emph{same}

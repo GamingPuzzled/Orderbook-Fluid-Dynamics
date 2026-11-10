@@ -59,5 +59,12 @@ case "$PHASE" in
     ;;
 esac
 
+# regenerate paper tables / figures (cross-asset ones pick up every processed symbol)
+$UV run python scripts/tables.py >> "$LOG" 2>&1
+$UV run python scripts/figures.py >> "$LOG" 2>&1
+$UV run python scripts/crossasset.py >> "$LOG" 2>&1
+(cd paper && rm -f ../paper_overleaf.zip && zip -qr ../paper_overleaf.zip main.tex references.bib \
+  tables figures) >> "$LOG" 2>&1
+
 crontab -l 2>/dev/null | grep -v "resume_downloads.sh\" $PHASE" | crontab -
 echo "done $(date)" >> "$LOG"
