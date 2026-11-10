@@ -1,0 +1,45 @@
+[project]
+name = "lobflow"
+version = "0.1.0"
+description = "Spatial refill of swept limit order books: data pipeline and estimators"
+requires-python = ">=3.12"
+dependencies = [
+    "numba>=0.68.1",
+    "numpy>=2.0",
+    "polars>=1.0",
+    "pyarrow>=16.0",
+    "scipy>=1.18.1",
+]
+
+[project.scripts]
+lobflow = "lobflow.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "matplotlib>=3.11.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lobflow"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
