@@ -121,4 +121,5 @@ uv run pytest && uv run ruff check src tests scripts && uv run mypy src
 
 ## Licence
 
-Not yet chosen.
+Code: MIT (see [`LICENSE`](LICENSE)). The paper text and figures in `paper/` are not covered by
+the code licence; all rights reserved by the author.

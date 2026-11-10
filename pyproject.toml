@@ -3,6 +3,8 @@ name = "lobflow"
 version = "0.1.0"
 description = "Spatial refill of swept limit order books: data pipeline and estimators"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "numba>=0.68.1",
     "numpy>=2.0",
