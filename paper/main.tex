@@ -438,9 +438,10 @@ rebuild comes from non-local reallocation and a source.
 
 \paragraph{Resilience.} Empirical work on order book resilience measures how fast spreads and
 depth recover after aggressive orders. \citet{large2007resiliency} estimates a
-multivariate point process on London Stock Exchange data and finds that the book often fails to
-replenish, with a half-life of around 20 seconds when it does. \citet{degryse2005aggressive}
-study the aftermath of aggressive orders on Euronext; \citet{xu2017resiliency} find that spread
+multivariate point process for Barclays shares on the London Stock Exchange; as summarised by
+\citet{xu2017resiliency}, the book fails to replenish reliably after a large trade in over 60\%
+of cases, and replenishes with a half-life of around 20 seconds when it does.
+\citet{degryse2005aggressive} study the aftermath of aggressive orders on the Paris Bourse; \citet{xu2017resiliency} find, for Chinese stocks, that spread
 and depth at the best quotes recover within about 20 best-limit updates; and
 \citet{clapham2021speed} show that high-frequency traders restore the spread within seconds,
 whereas depth is rebuilt more slowly and mostly by other participants.
@@ -491,8 +492,9 @@ the spread, the closest equity precedent for our repositioning phase; our contri
 separate repositioning from new liquidity through a mass balance and to order the phases in
 time.
 
-\paragraph{Crypto perpetual futures.} \citet{albers2025dilemma} study market making on a
-crypto perpetual futures venue and its fee and queue-position constraints. Crypto venues
+\paragraph{Crypto perpetual futures.} \citet{albers2025dilemma} run a live market-making
+experiment on the Binance Bitcoin perpetual and document a trade-off between fill probability
+and post-fill returns that depends on queue position. Crypto venues
 publish full-depth incremental feeds with aggressor flags, which make the decomposition here
 feasible without order identifiers.
 
