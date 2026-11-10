@@ -29,6 +29,7 @@ import json
 import zlib
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -179,22 +180,56 @@ def load_snapshot(path: Path) -> Snapshot:
     return Snapshot(recv, int(b["microtimestamp"]), side(b["bids"]), side(b["asks"]))
 
 
-def load_events(raw_root: Path, cache_root: Path, *, skip_latest: bool = True) -> pl.DataFrame:
-    """All hourly files under ``raw_root`` (cached per file as parquet), sorted by receive
-    order. The newest file is skipped by default (it is still being written)."""
+CACHE_VERSION = 2  # bump when parsing changes, so cached hours are re-parsed
+
+
+def _utc(us: int) -> str:
+    return datetime.fromtimestamp(us / 1e6, tz=UTC).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def parse_utc(ts: str | None) -> int | None:
+    """ISO-8601 time (UTC if no offset, e.g. ``2026-11-10T16:00``) -> µs since epoch."""
+    if ts is None:
+        return None
+    dt = datetime.fromisoformat(ts)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return int(dt.timestamp() * 1_000_000)
+
+
+def load_events(
+    raw_root: Path,
+    cache_root: Path,
+    *,
+    skip_latest: bool = True,
+    until_us: int | None = None,
+) -> pl.DataFrame:
+    """Hourly files under ``raw_root`` (cached per file as parquet), sorted by receive order,
+    restricted to receive times before ``until_us``. The newest file is skipped by default (it
+    is still being written). There is no lower cut: replay needs each connection's marker, so
+    restrict *anchors* instead (``run_l3(since=...)``)."""
     files = sorted(Path(p) for p in glob.glob(str(raw_root / "*" / "[0-9]*.jsonl.gz")))
     if skip_latest and files:
         files = files[:-1]
+
+    def hour_start(f: Path) -> int:
+        return parse_utc(f"{f.parent.name}T{f.name[:2]}:00") or 0
+
+    if until_us is not None:
+        files = [f for f in files if hour_start(f) < until_us]
     parts = []
     for f in files:
-        c = cache_root / f.parent.name / f"{f.name.split('.')[0]}.parquet"
+        c = cache_root / f.parent.name / f"{f.name.split('.')[0]}.v{CACHE_VERSION}.parquet"
         if not c.exists() or c.stat().st_mtime < f.stat().st_mtime:
             c.parent.mkdir(parents=True, exist_ok=True)
             parse_file(f).write_parquet(c)
-        parts.append(pl.read_parquet(c).with_columns(pl.lit(str(c)).alias("file")))
+        parts.append(pl.read_parquet(c))
     if not parts:
         return pl.DataFrame(schema=SCHEMA)
-    return pl.concat(parts).sort("recv_us", "seq", maintain_order=True).drop("file")
+    ev = pl.concat(parts).sort("recv_us", "seq", maintain_order=True)
+    if until_us is not None:
+        ev = ev.filter(pl.col("recv_us") < until_us)
+    return ev
 
 
 def load_snapshots(raw_root: Path) -> list[Snapshot]:
@@ -287,25 +322,41 @@ class Book:
 
 
 def segments(
-    events: pl.DataFrame, snaps: Sequence[Snapshot], *, silence_us: int = 5_000_000
+    events: pl.DataFrame, snaps: Sequence[Snapshot], *, silence_us: int = 60_000_000
 ) -> list[tuple[int, int, Snapshot]]:
-    """(start_row, end_row, snapshot) per websocket connection: rows from one subscription
-    marker to the next, paired with the snapshot requested closest to the marker (the
-    recorder requests it right after subscribing, so it can precede the logged marker),
-    within ``max_gap`` = 60 s. A segment is cut at the first receive gap > ``silence_us``
-    (a dropped connection whose reconnect marker may be missing): later rows have no valid
-    book until the next marker."""
+    """(start_row, end_row, snapshot) pieces over which the book can be replayed.
+
+    Each websocket connection runs from one subscription marker to the next and starts from
+    the snapshot requested closest to the marker (within 60 s; the recorder requests it right
+    after subscribing, so it can precede the logged marker). A connection is also cut at any
+    receive gap longer than ``silence_us`` (possible message loss); replay resumes at the first
+    later snapshot of the same connection (the recorder saves one every 15 min). Shorter gaps
+    are genuine quiet periods on Bitstamp: no deletes of unseen orders follow them.
+    """
     max_gap = 60_000_000
     ev = events["ev"].to_numpy()
     recv = events["recv_us"].to_numpy()
     starts = list(np.flatnonzero(ev == EV_SUB)) + [len(events)]
     gaps = np.flatnonzero(np.diff(recv) > silence_us) + 1  # first row after each gap
-    out = []
+    snap_t = np.array([s.recv_us for s in snaps], dtype=np.int64)
+    out: list[tuple[int, int, Snapshot]] = []
     for a, b in zip(starts[:-1], starts[1:], strict=True):
-        snap = min(snaps, key=lambda s: abs(s.recv_us - recv[a]), default=None)
-        if snap is not None and abs(snap.recv_us - recv[a]) <= max_gap:
-            g = gaps[(gaps > a + 2) & (gaps < b)]  # ignore the subscribe/snapshot pause
-            out.append((int(a), int(g[0]) if len(g) else int(b), snap))
+        cuts = [int(g) for g in gaps if a + 2 < g < b]
+        bounds = [int(a), *cuts, int(b)]
+        for k, (lo, hi) in enumerate(zip(bounds[:-1], bounds[1:], strict=True)):
+            if hi <= lo:
+                continue
+            if k == 0:
+                snap = min(snaps, key=lambda s: abs(s.recv_us - recv[lo]), default=None)
+                if snap is None or abs(snap.recv_us - recv[lo]) > max_gap:
+                    continue
+                out.append((lo, hi, snap))
+            else:  # after a long gap: restart from the first snapshot received after it
+                j = int(np.searchsorted(snap_t, recv[lo - 1], side="right"))
+                if j >= len(snaps) or snap_t[j] > recv[hi - 1]:
+                    continue
+                first = int(np.searchsorted(recv, snap_t[j], side="left"))
+                out.append((max(first, lo), hi, snaps[j]))
     return out
 
 
@@ -656,18 +707,31 @@ def run_l3(
     lag_ms: float = 100.0,
     n_boot: int = 500,
     seed: int = 0,
+    since: str | None = None,
+    until: str | None = None,
 ) -> str:
-    """Full Bitstamp L3 analysis; writes ``l3.md`` and ``l3_*.parquet`` to ``results_dir``."""
+    """Full Bitstamp L3 analysis; writes ``l3.md`` and ``l3_*.parquet`` to ``results_dir``.
+
+    ``since`` / ``until`` (ISO-8601, UTC unless an offset is given) freeze the sample: events
+    received at or after ``until`` are dropped, and sweeps / placebo times before ``since``
+    (or within the last 2 s of the window) are not analysed."""
     from lobflow.state import nn_weights
 
     rng = np.random.default_rng(seed)
-    ev = load_events(raw_root, cache_root)
+    since_us, until_us = parse_utc(since), parse_utc(until)
+    ev = load_events(raw_root, cache_root, until_us=until_us)
     snaps = load_snapshots(raw_root)
+    if until_us is not None:
+        snaps = [s for s in snaps if s.recv_us < until_us]
     trades = ev.filter(pl.col("ev") == EV_TRADE)
     sweeps = find_sweeps(trades, min_levels=min_levels, min_bps=min_bps)
     takers = find_sweeps(trades, min_levels=2, isolate_ms=0)
+    if since_us is not None:
+        sweeps = sweeps.filter(pl.col("t_first") >= since_us)
     r0, _ = replay(ev, snaps)
     plac = placebo_times(r0, takers, n=placebo_per_sweep * len(sweeps), seed=seed)
+    if since_us is not None:
+        plac = plac.filter(pl.col("t_first") >= since_us)
     anchors = (
         pl.concat(
             [
@@ -779,6 +843,11 @@ def run_l3(
     ml = [f"{a}-{b}" for a, b in zip(mbins[:-1], mbins[1:], strict=True)] + list(pooled)
     lines = [
         "# Bitstamp BTC/USD order-level (L3) replication",
+        "",
+        f"Window (receive time, UTC): {_utc(int(ev['recv_us'].min()))} to "  # type: ignore[arg-type]
+        f"{_utc(int(ev['recv_us'].max()))}"  # type: ignore[arg-type]
+        + (f" (since={since}, until={until})" if since or until else "")
+        + ".",
         "",
         f"Sample: {hours:.1f} h, {n_ord:,} order events, {trades.height:,} trades; "
         f"{groups[1].height} isolated sweeps (taker filling at ≥{min_levels} prices spanning "

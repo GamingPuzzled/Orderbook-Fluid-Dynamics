@@ -88,7 +88,7 @@ three ordered phases:
         matched placebo times. The match is in aggregate flows. In the 20\,ms level-2 feed,
         exact-size tracing links only about 1\% of near-touch additions to deeper
         cancellations, but this reflects netting: in a preliminary order-level sample from
-        Bitstamp, exact-amount cancel-and-repost moves supply about a fifth of near-touch
+        Bitstamp, exact-amount cancel-and-repost moves supply about a quarter of near-touch
         added volume.
   \item \textbf{Source} (centroid $\approx$ 415--510\,ms): after roughly 140\,ms (ETH) to
         140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
@@ -328,22 +328,22 @@ price, which hides moves at busy levels, and post-sweep levels are the busiest. 
 interpret repositioning as a depth-conserving reallocation in aggregate flows.
 
 Order-level data show that the low Bybit match rate reflects netting rather than the absence of
-moves. In a preliminary 7.2-hour sample of Bitstamp's public BTC/USD order feed (7.5 million
-order events, each with its own identifier and millisecond timestamp, so nothing is netted),
+moves. In a preliminary 7.2-hour sample of Bitstamp's public BTC/USD order feed (10 November
+2026, 08:50--16:00 UTC; 7.5 million order events, each with its own identifier and millisecond timestamp, so nothing is netted),
 resting orders are never re-priced in place: price changes in \texttt{order\_changed} events
 occur only for aggressive orders as they fill. A moved order therefore appears as a
 cancellation followed by a new order, whose amount is exact to the satoshi. Within 1\,bp of the
-opposite quote, 43\% of added volume in the second after a sweep (41\% at state-matched
+opposite quote, 44\% of added volume in the second after a sweep (38\% at state-matched
 placebo times) has a cancellation of the identical amount at a strictly deeper price within
 100\,ms. A one-satoshi-off control matches almost nothing, and a control that repeats the rule
 against cancellations 2\,s later, which absorbs market makers' habit of reusing quote sizes,
-removes about half; the remaining 22\% (95\% CI 16--28\%) after sweeps and 21\% (16--26\%)
+removes about half; the remaining 25\% (95\% CI 21--30\%) after sweeps and 24\% (20--28\%)
 at placebo times are cancel-and-repost moves toward the touch. Moving existing orders is
-therefore a routine way of supplying near-touch liquidity, not a rare event. With only 101
-sweeps, and placebo matching that remains imperfect (standardised differences up to 0.39), this
+therefore a routine way of supplying near-touch liquidity, not a rare event. With only 166
+sweeps, and placebo matching that remains imperfect (standardised differences up to 0.25), this
 sample cannot yet say whether moves intensify after sweeps, and the post-sweep dip in additions
-relative to cancellations is below one but not significant ($\kappa_{20\text{--}40}=0.89$,
-CI 0.65--1.17). \todo{Update with the full Bitstamp sample.}
+relative to cancellations is below one but not significant ($\kappa_{20\text{--}40}=0.87$,
+CI 0.70--1.12). \todo{Update with the full Bitstamp sample.}
 
 \subsection{What a follow-up order pays}
 \label{sec:exec}
@@ -557,9 +557,9 @@ share, and the timing of the three phases (95\% day-cluster intervals).}
   \item \textbf{Level-2 data.} Without order identifiers we cannot show that the \emph{same}
         orders move; repositioning is identified from matched aggregate cancellation and
         addition flows. Bitstamp's order-level feed shows that exact-amount cancel-and-repost
-        moves supply about a fifth of near-touch added volume, but that sample is short
-        (7.2 hours, 101 sweeps), on a spot venue, and its placebo matching is imperfect
-        (standardised differences up to 0.39).
+        moves supply about a quarter of near-touch added volume, but that sample is short
+        (7.2 hours, 166 sweeps), on a spot venue, and its placebo matching is imperfect
+        (standardised differences up to 0.25).
   \item \textbf{Push netting.} Each 20\,ms message nets changes at a price, so gross flows are
         lower bounds.
   \item \textbf{Fill matching.} About one third of sweep volume exceeds the displayed size at

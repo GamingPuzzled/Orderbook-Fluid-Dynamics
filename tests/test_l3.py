@@ -155,3 +155,19 @@ def test_move_flags_exact_lot_and_time_controls() -> None:
     assert m["exact"].to_list() == [True, False, False, False]
     assert m["ctrl_lot"].to_list() == [0.0, 0.0, 0.5, 0.0]
     assert m["ctrl_time"].to_list() == [False, False, False, True]
+
+
+def test_segments_cut_long_gaps_and_resume_from_next_snapshot() -> None:
+    s = 1_000_000
+    recv = [0, 1 * s, 2 * s, 3 * s, 100 * s, 101 * s, 200 * s, 201 * s, 202 * s]
+    evc = [l3.EV_SUB, 0, 0, 0, 0, 0, 0, 0, 0]
+    ev = pl.DataFrame({"recv_us": recv, "ev": evc}, schema_overrides={"ev": pl.Int8})
+
+    def snap(t: int) -> l3.Snapshot:
+        return l3.Snapshot(t, t, [], [])
+
+    # snapshot at connect, none between the 1st gap and the 2nd, one after the 2nd gap
+    segs = l3.segments(ev, [snap(0), snap(150 * s)], silence_us=60 * s)
+    assert [(a, b, sn.recv_us) for a, b, sn in segs] == [(0, 4, 0), (6, 9, 150 * s)]
+    # short gaps (genuine quiet periods) do not cut
+    assert len(l3.segments(ev, [snap(0)], silence_us=1000 * s)) == 1

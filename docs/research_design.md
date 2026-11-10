@@ -384,3 +384,9 @@ Line-by-line paper audit (2026-11-10): fixed κ rounding (0.735 → 0.73), CEM c
 not 100%), relocation ≈ 1 gap width (not 1.5–2.5×; that came from a one-day diagnostic), sample
 end dates, sweep-isolation wording, jump rate renamed γ, Diana–Gebbie and Bechler–Ludkovski
 descriptions checked against the papers.
+Frozen sample (2026-11-10): `lobflow l3 --until 2026-11-10T16:00` (08:50–16:00 UTC). Segment fix:
+5 s silence cut discarded 80 min (65 sweeps) of valid data — gaps of 6–16 s are genuine Bitstamp
+quiet periods (0 deletes of unseen order IDs afterwards). Now cut only on reconnect or >60 s
+silence, resuming from the next snapshot (recorder saves one every 15 min). Result: 166 sweeps,
+3,320 placebo, balance ≤ 0.25; moves beyond time control 25% [21, 30] vs 24% [20, 28];
+κ(20–40) 0.87 [0.70, 1.12]. Recorders run under launchd (scripts/install_recorders.sh).

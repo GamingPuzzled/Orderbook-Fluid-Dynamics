@@ -252,6 +252,8 @@ def _cmd_l3(a: argparse.Namespace) -> int:
         min_bps=a.min_bps,
         near_bps=a.near_bps,
         n_boot=a.n_boot,
+        since=a.since,
+        until=a.until,
     )
     print(text)
     return 0
@@ -396,6 +398,8 @@ def build_parser() -> argparse.ArgumentParser:
     l3p.add_argument("--min-bps", type=float, default=0.5)
     l3p.add_argument("--near-bps", type=float, default=1.0)
     l3p.add_argument("--n-boot", type=int, default=500)
+    l3p.add_argument("--since", help="ISO time (UTC): analyse sweeps from here on")
+    l3p.add_argument("--until", help="ISO time (UTC): drop events from here on (freeze sample)")
     l3p.set_defaults(fn=_cmd_l3)
 
     ro = sub.add_parser("robustness", help="matching comparison and subset robustness table")

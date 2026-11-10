@@ -4,7 +4,7 @@ moves the *same* orders (the level-2 data cannot show this).
 
 Output: data/raw/bitstamp_l3/<pair>/<YYYY-MM-DD>/<HH>.jsonl.gz, one JSON object per line:
     {"recv_us": <local receive time, µs>, "msg": <raw websocket message>}
-plus a REST order-book snapshot (with order IDs) at every (re)connect:
+plus a REST order-book snapshot (with order IDs) at every (re)connect and every 15 minutes:
     .../snapshot_<recv_us>.json.gz
 
 Usage (runs until stopped; reconnects with backoff):
@@ -74,6 +74,33 @@ def snapshot(pair: str, root: Path) -> None:
     log.info("snapshot saved: %s (%d bytes)", path.name, len(body))
 
 
+SNAPSHOT_EVERY_S = 900.0  # periodic resync points for replay after feed gaps
+
+
+async def periodic_snapshots(pair: str, root: Path) -> None:
+    """Save a REST snapshot every ``SNAPSHOT_EVERY_S`` while connected (errors are logged)."""
+    while True:
+        await asyncio.sleep(SNAPSHOT_EVERY_S)
+        try:
+            await asyncio.to_thread(snapshot, pair, root)
+        except OSError as exc:
+            log.warning("periodic snapshot failed: %s", exc)
+
+
+async def consume(ws: websockets.ClientConnection, writer: HourlyWriter) -> None:
+    """Write every message with its local receive time until the server asks to reconnect."""
+    n = 0
+    async for msg in ws:
+        now = time.time()
+        writer.write(json.dumps({"recv_us": int(now * 1e6), "msg": json.loads(msg)}), now)
+        n += 1
+        if n % 100_000 == 0:
+            log.info("%d messages", n)
+        if '"bts:request_reconnect"' in str(msg):
+            log.info("server requested reconnect")
+            return
+
+
 async def record(pair: str, root: Path) -> None:
     # SIGTERM (launchd stop, kill) cancels this task so the gzip file is closed cleanly
     task = asyncio.current_task()
@@ -95,18 +122,11 @@ async def record(pair: str, root: Path) -> None:
                     # snapshot after subscribing, so no gap between book and stream
                     await asyncio.to_thread(snapshot, pair, root)
                     backoff = 1.0
-                    n = 0
-                    async for msg in ws:
-                        now = time.time()
-                        writer.write(
-                            json.dumps({"recv_us": int(now * 1e6), "msg": json.loads(msg)}), now
-                        )
-                        n += 1
-                        if n % 100_000 == 0:
-                            log.info("%d messages", n)
-                        if '"bts:request_reconnect"' in str(msg):
-                            log.info("server requested reconnect")
-                            break
+                    resync = asyncio.create_task(periodic_snapshots(pair, root))
+                    try:
+                        await consume(ws, writer)
+                    finally:
+                        resync.cancel()
             except (OSError, websockets.WebSocketException, TimeoutError) as exc:
                 log.warning("connection lost: %s; retry in %.0f s", exc, backoff)
                 writer.close()
