@@ -448,7 +448,7 @@ def find_sweeps(
             (1 - pl.col("side")).cast(pl.Int8).alias("book_side"),
         )
         .filter((pl.col("n_levels") >= min_levels) & (pl.col("span_bps") >= min_bps))
-        .sort("t_first")
+        .sort("t_first", "id")
     )
     prev_end = g["t_end"].shift(1).fill_null(-(10**18))
     return g.filter(g["t_first"] - prev_end.cum_max() > isolate_ms * 1000)
@@ -469,6 +469,7 @@ def placebo_times(
         events.filter(pl.col("seg") >= 0)
         .group_by("seg")
         .agg(pl.col("t_us").min().alias("a"), pl.col("t_us").max().alias("b"))
+        .sort("seg")  # group_by order is arbitrary; the draws must be reproducible
     )
     g = guard_ms * 1000
     spans = [(a + g, b - g - 1_000_000) for a, b in seg.select("a", "b").iter_rows()]
@@ -653,6 +654,74 @@ def bin_label(dt: pl.Expr, bins: Sequence[int] = BINS_MS) -> pl.Expr:
     return expr
 
 
+PHASE_EDGES: tuple[int, ...] = (20, 40, 60, 80, 100, 140, 200, 300, 450, 650, 1000)
+
+
+def three_phase(
+    flows: pl.DataFrame,
+    anchors: pl.DataFrame,
+    *,
+    near_bps: float = 1.0,
+    edges: Sequence[int] = PHASE_EDGES,
+    n_boot: int = 300,
+    seed: int = 0,
+) -> dict[str, tuple[float, float, float]]:
+    """Withdrawal / repositioning / source split, as for the level-2 data (``model.py``).
+
+    Per window w: near net build-up N = adds − cancels within ``near_bps`` of the opposite
+    quote, deep net depletion J = cancels − adds between ``near_bps`` and the flow window
+    (10 bps); both as excess over weighted placebo, as fractions of pre-sweep swept-side depth
+    (ratio of sums, ``depth_pre_swept``). T = max(min(N, J), 0), W = max(J − T, 0),
+    S = max(N − T, 0). Returns stat -> (value, 2.5%, 97.5%) from an anchor bootstrap
+    (sweeps and placebo resampled separately).
+    """
+    from lobflow.model import observed_summary
+
+    e = np.asarray(edges, dtype=np.float64)
+    vol = pl.col("amt").cast(pl.Float64) / SAT
+    f = flows.filter((pl.col("dist_bps") >= 0) & pl.col("kind").is_in(["add", "cancel"]))
+    near = pl.col("dist_bps") <= near_bps
+    sign_n = pl.when(pl.col("kind") == "add").then(1.0).otherwise(-1.0)
+    f = f.with_columns(
+        pl.when(near).then(vol * sign_n).otherwise(0.0).alias("n_val"),
+        pl.when(near).then(0.0).otherwise(-vol * sign_n).alias("j_val"),
+    )
+
+    def arrays(a: pl.DataFrame) -> tuple[F64, F64, F64, F64]:
+        fa = f.filter(pl.col("aid").is_in(a["aid"].implode()))
+        n = _per_anchor(fa, pl.col("n_val"), edges, a["aid"])
+        j = _per_anchor(fa, pl.col("j_val"), edges, a["aid"])
+        return n, j, a["depth_pre_swept"].to_numpy(), a["w"].to_numpy()
+
+    s_arr = arrays(anchors.filter(pl.col("is_sweep") == 1))
+    p_arr = arrays(anchors.filter(pl.col("is_sweep") == 0))
+
+    def frac(n: F64, j: F64, d: F64, w: F64) -> tuple[F64, F64]:
+        den = float(w @ d)
+        return (w @ n) / den, (w @ j) / den
+
+    def summary(si: npt.NDArray[np.int64], pi: npt.NDArray[np.int64]) -> dict[str, float]:
+        sn, sj = frac(*(x[si] for x in s_arr))
+        pn, pj = frac(*(x[pi] for x in p_arr))
+        nn, jj = sn - pn, sj - pj
+        t = np.maximum(np.minimum(nn, jj), 0.0)
+        return observed_summary(e, t, np.maximum(jj - t, 0.0), np.maximum(nn - t, 0.0))
+
+    ns, np_ = len(s_arr[2]), len(p_arr[2])
+    point = summary(np.arange(ns), np.arange(np_))
+    rng = np.random.default_rng(seed)
+    draws = [summary(rng.integers(0, ns, ns), rng.integers(0, np_, np_)) for _ in range(n_boot)]
+    out = {}
+    for k, v in point.items():
+        d = np.array([x[k] for x in draws], dtype=np.float64)
+        out[k] = (
+            float(v),
+            float(np.nanpercentile(d, 2.5)) if np.isfinite(d).any() else float("nan"),
+            float(np.nanpercentile(d, 97.5)) if np.isfinite(d).any() else float("nan"),
+        )
+    return out
+
+
 # ---------------------------------------------------------------- report
 
 KAPPA_BINS: tuple[int, ...] = (0, 20, 40, 60, 100, 250, 500, 1000)
@@ -796,6 +865,8 @@ def run_l3(
         for k, v in ext.items():
             share[g][k] = _boot_ratio(v, tot_ext, a["w"].to_numpy(), n_boot, sub)
 
+    phases = three_phase(early, anc, near_bps=near_bps, n_boot=n_boot, seed=seed)
+
     # same-ID in-place moves into the touch: share of near-touch inflow (adds + moves in)
     toward = (
         pl.when(pl.col("side") == 1)
@@ -883,6 +954,16 @@ def run_l3(
             f"{fmt(s0['time'][0][j])} | {ci(*s0['beyond'], j)} |"
         )
     lines += [
+        "",
+        "## Three-phase decomposition (as for Bybit)",
+        "",
+        f"Near: within {near_bps} bps of the opposite quote; deep: {near_bps}–10 bps. Excess over "
+        "NN-matched placebo, fractions of pre-sweep swept-side depth within 10 bps; windows "
+        f"{', '.join(map(str, PHASE_EDGES))} ms. 95% anchor-bootstrap CIs.",
+        "",
+        "| stat | value | 95% CI |",
+        "|---|---|---|",
+        *[f"| {k} | {v[0]:.3f} | [{v[1]:.3f}, {v[2]:.3f}] |" for k, v in phases.items()],
         "",
         "## Same-ID in-place moves into the touch",
         "",

@@ -390,3 +390,7 @@ quiet periods (0 deletes of unseen order IDs afterwards). Now cut only on reconn
 silence, resuming from the next snapshot (recorder saves one every 15 min). Result: 166 sweeps,
 3,320 placebo, balance ≤ 0.25; moves beyond time control 25% [21, 30] vs 24% [20, 28];
 κ(20–40) 0.87 [0.70, 1.12]. Recorders run under launchd (scripts/install_recorders.sh).
+Bitstamp three-phase decomposition (`l3.three_phase`, near ≤ 1 bp, deep 1–10 bp): on the frozen
+166-sweep sample all components are ≤ 3% of pre-sweep depth with wide CIs (transport 0.003
+[0.000, 0.019], withdrawal 0.030 [0.020, 0.116], source 0.009 [0.002, 0.027]) — too noisy to
+report; rerun after ~1 week of recording. Placebo draws made deterministic (sorted segments).

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import polars as pl
+import pytest
 
 from lobflow import l3
 
@@ -171,3 +172,27 @@ def test_segments_cut_long_gaps_and_resume_from_next_snapshot() -> None:
     assert [(a, b, sn.recv_us) for a, b, sn in segs] == [(0, 4, 0), (6, 9, 150 * s)]
     # short gaps (genuine quiet periods) do not cut
     assert len(l3.segments(ev, [snap(0)], silence_us=1000 * s)) == 1
+
+
+def test_three_phase_classifies_matched_deep_cancel_and_near_add_as_repositioning() -> None:
+    anchors = pl.DataFrame(
+        {"aid": [0, 1], "is_sweep": [1, 0], "depth_pre_swept": [10.0, 10.0], "w": [1.0, 1.0]}
+    )
+    sat = l3.SAT
+
+    def row(aid: int, dt: float, kind: str, dist: float, btc: float) -> dict[str, object]:
+        return {"aid": aid, "dt_ms": dt, "kind": kind, "dist_bps": dist, "amt": int(btc * sat)}
+
+    flows = pl.DataFrame(
+        [
+            row(0, 30, "cancel", 5.0, 2.0),  # deep depletion 2
+            row(0, 30, "add", 0.5, 1.0),  # near build-up 1 -> repositioning 1, withdrawal 1
+            row(0, 500, "add", 0.5, 3.0),  # late near build-up -> source 3
+            row(1, 30, "add", 0.5, 0.0),  # placebo: nothing
+        ]
+    )
+    out = l3.three_phase(flows, anchors, near_bps=1.0, n_boot=5)
+    assert out["transport"][0] == pytest.approx(0.1)
+    assert out["withdrawal"][0] == pytest.approx(0.1)
+    assert out["source"][0] == pytest.approx(0.3)
+    assert out["transport_share_<250ms"][0] == pytest.approx(1.0)
