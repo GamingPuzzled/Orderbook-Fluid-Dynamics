@@ -232,6 +232,15 @@ def _cmd_pde(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_fitmodels(a: argparse.Namespace) -> int:
+    from lobflow.fitmodels import run_fitmodels
+
+    out = Path(a.events) / a.exchange / a.symbol
+    res = Path(a.results) / a.exchange / a.symbol
+    print(run_fitmodels(out, res, max_push_ms=a.max_push_ms, n_boot_params=a.n_boot))
+    return 0
+
+
 def _cmd_execution(a: argparse.Namespace) -> int:
     from lobflow.execution import run_execution
 
@@ -379,6 +388,15 @@ def build_parser() -> argparse.ArgumentParser:
     pd_.add_argument("--folds", type=int, default=5)
     pd_.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     pd_.set_defaults(fn=_cmd_pde)
+
+    fm = sub.add_parser("fitmodels", help="compare parametric refill models out of sample")
+    fm.add_argument("--exchange", required=True)
+    fm.add_argument("--symbol", required=True)
+    fm.add_argument("--events", default="data/events")
+    fm.add_argument("--results", default="results")
+    fm.add_argument("--n-boot", type=int, default=100, help="bootstrap refits per model")
+    fm.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
+    fm.set_defaults(fn=_cmd_fitmodels)
 
     ex = sub.add_parser("execution", help="cost of a follow-up market order after sweeps")
     ex.add_argument("--exchange", required=True)

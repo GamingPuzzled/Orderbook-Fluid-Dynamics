@@ -6,10 +6,11 @@ Code for the paper *Pulled, moved, then made: how crypto order books refill afte
 sweeps* (Joel Pulikkan, draft in [`paper/main.tex`](paper/main.tex)).
 
 After an aggressive order sweeps several price levels, the swept side of the book refills in
-three ordered phases: **withdrawal** (deep orders cancelled, ~50–110 ms), **repositioning**
-(depth cancelled deep is posted near the new best quote, ~130–360 ms) and **new liquidity**
-(additions exceed cancellations, ~0.4–0.5 s). Local diffusion adds no out-of-sample predictive
-power for the depth profile.
+three phases: **withdrawal** (deep orders cancelled from the sweep on) and **repositioning**
+(depth cancelled deep is posted near the new best quote, an early pulse with mean ~50 ms),
+followed by **new liquidity** (additions exceed cancellations, ~0.4–0.8 s). A parametric
+three-phase model beats exponential recovery out of sample (`lobflow fitmodels`), and local
+diffusion adds no predictive power for the depth profile.
 
 Design notes and running log of results: [`docs/research_design.md`](docs/research_design.md);
 literature review: [`docs/literature_review.md`](docs/literature_review.md).
@@ -50,6 +51,7 @@ uv run lobflow robustness --exchange $EX --symbol $SYM          # NN matching, s
 uv run lobflow moves      --exchange $EX --symbol $SYM          # exact-size matching (L2)
 uv run lobflow pde        --exchange $EX --symbol $SYM          # local vs non-local fits
 uv run lobflow execution  --exchange $EX --symbol $SYM          # follow-up order cost
+uv run lobflow fitmodels  --exchange $EX --symbol $SYM          # parametric model comparison
 ```
 
 Bitstamp order-level replication (frozen sample used in the paper):
@@ -77,6 +79,7 @@ uv run python scripts/crossasset.py   # Table: cross-asset summary; Figure 4 (al
 | Execution table, Fig. 5 | `execution.parquet` | `execution` → `tables.py`, `figures.py` |
 | PDE table | `pde_oos.parquet` | `pde` → `tables.py` |
 | Robustness table | `robustness.parquet` | `robustness` → `tables.py` |
+| Model comparison table, Fig. 6 | `fitmodels_*.parquet` | `fitmodels` → `tables.py`, `figures.py` |
 | Cross-asset table / Fig. 4 | all of the above | `crossasset.py` |
 
 Every table in the paper is generated from these files (none is typed by hand). Bootstrap seeds are fixed, so reruns on the same days reproduce the numbers exactly.
@@ -112,6 +115,7 @@ for BTC/USD), plus a REST snapshot at each connect and every 15 minutes.
 | `moves.py` | Exact-size matching of near-touch adds to deeper cancels (L2) |
 | `pde.py` | Out-of-sample local vs non-local continuum model fits |
 | `execution.py` | Cost of a follow-up market order after sweeps |
+| `fitmodels.py` | Parametric refill models compared out of sample |
 | `l3.py` | Bitstamp order-level replay, sweeps, flows and move tests |
 | `cli.py` | `lobflow` command-line interface |
 

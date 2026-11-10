@@ -394,3 +394,16 @@ Bitstamp three-phase decomposition (`l3.three_phase`, near ≤ 1 bp, deep 1–10
 166-sweep sample all components are ≤ 3% of pre-sweep depth with wide CIs (transport 0.003
 [0.000, 0.019], withdrawal 0.030 [0.020, 0.116], source 0.009 [0.002, 0.027]) — too noisy to
 report; rerun after ~1 week of recording. Placebo draws made deterministic (sorted segments).
+
+### 15.10 Parametric model comparison (`lobflow fitmodels`, 2026-11-10)
+
+Nine gamma-rate models fitted to excess N(w), J(w) (20–1000 ms), weighted LS with day-bootstrap
+SEs, 5-fold day CV. BTC / ETH CV R²: A exp. recovery 0.40/0.14; B two exponentials 0.79/0.83;
+C no move 0.50/0.80; D no source 0.46/0.77; E three-phase 0.82/0.86; F free shapes 0.82/0.86
+(params at bounds, overfit); G E + late withdrawal 0.90/0.88; H no move + late W 0.56/0.83;
+I E + late move 0.90/0.85. Robust: move = early pulse, mean 46–53 ms (peak ~25 ms), mass 0.17
+BTC / 0.10 ETH; source mean 0.55–0.78 s. BTC late deep depletion (650–1000 ms, in 6–50 ticks,
+not 51+) fits equally as late withdrawal or late move → not identifiable from aggregates. The
+window-based repositioning centroids (322/133 ms) include it; paper now says repositioning is
+concentrated in the first ~100 ms and overlaps withdrawal. χ²/dof ≈ 10: profiles summarise,
+not exact.

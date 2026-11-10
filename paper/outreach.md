@@ -22,14 +22,15 @@ cancellations and fills, which gives a mass balance of the swept side.
 **Findings.**
 
 1. **Three ordered phases**, the same for both assets:
-   - **Withdrawal** (~50–110 ms): deep orders are cancelled, a multi-level version of the
-     "quote fade" documented for equities by Malinova & Park.
-   - **Repositioning** (~130–360 ms): depth cancelled deep in the book is re-posted near the new
+   - **Withdrawal** (from the sweep on): deep orders are cancelled, a multi-level version of
+     the "quote fade" documented for equities by Malinova & Park.
+   - **Repositioning** (first ~100 ms, overlapping withdrawal): depth cancelled deep in the book is re-posted near the new
      best quote. It supplies 74–93% of the early rebuild while total depth *falls*
      (added ÷ cancelled = 0.61–0.73, against ≈1.0 at matched placebo times).
-   - **New liquidity** (~0.4–0.5 s): only then do additions exceed cancellations.
-2. **No diffusion.** In out-of-sample fits of the depth profile, a local diffusion term adds no
-   predictive power; a non-local jump term and a delayed source fit the data.
+   - **New liquidity** (~0.4–0.8 s): only then do additions exceed cancellations.
+2. **Model comparison.** Out of sample, a three-phase model (withdrawal + early move pulse with
+   mean ~50 ms + delayed source) beats exponential recovery and every model without the move or
+   the source. A local diffusion term adds no predictive power for the depth profile.
 3. **Execution.** A follow-up market order pays 2–3× the normal cost 20 ms after a sweep, but
    about 90% of that excess is gone within 250 ms, during repositioning.
 4. **Order-level check (preliminary).** On Bitstamp, about a quarter of near-touch liquidity is
@@ -55,10 +56,10 @@ order books refill after large aggressive trades, and given your work on [specif
 topic of theirs], I'd be grateful for your view on it.
 
 Using 20 ms order book data for Bitcoin and Ether perpetual futures (about 42,000 events), I
-find that refill happens in three ordered phases: market makers first pull deep orders (within
-~100 ms), then move existing depth to the new price (~100–350 ms), and only after ~0.4–0.5 s
-does new liquidity arrive. Out-of-sample fits show no role for the diffusion term that
-continuum order book models assume, and the excess cost of a follow-up trade is mostly gone
+find that refill happens in three phases: within the first ~100 ms market makers pull deep
+orders and move existing depth to the new price, and only after ~0.4–0.8 s does new liquidity
+arrive. A three-phase parametric model beats exponential recovery out of sample, there is no
+role for the diffusion term that continuum order book models assume, and the excess cost of a follow-up trade is mostly gone
 within 250 ms. A one-page summary and the main figure are attached; the code is public at
 https://github.com/GamingPuzzled/Orderbook-Fluid-Dynamics.
 

@@ -26,14 +26,16 @@ refill directly, using 20-millisecond level-2 data from Bybit USDT perpetual fut
 and ETHUSDT, 85 days, 42{,}180 isolated multi-level sweeps) and a placebo matched on volume,
 volatility and depth. Measuring depth relative to the moving opposite quote and decomposing
 every book update into additions, cancellations and fills, we find that refill proceeds in
-three ordered phases: (i) \emph{withdrawal}, a multi-level quote fade in which deep orders are
-cancelled within about 50--110\,ms; (ii) \emph{repositioning}, a depth-conserving
+three phases: (i) \emph{withdrawal}, a multi-level quote fade in which deep orders are
+cancelled from the moment of the sweep; (ii) \emph{repositioning}, a depth-conserving
 reallocation in which depth cancelled deep in the book is matched by depth posted near the new
-best quote, supplying 74--93\% of the
+best quote, concentrated in the first $\sim$100\,ms and supplying 74--93\% of the
 near-touch rebuild in the first 250\,ms while total depth on the swept side \emph{falls}
 (additions/cancellations $=0.61$--$0.73$ at 20--40\,ms against $\approx 1.0$ in matched
-placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred at roughly 0.4--0.5\,s.
-In out-of-sample fits of the depth profile, a local diffusion term adds no predictive power.
+placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred at roughly
+0.4--0.8\,s. Out of sample, a parametric three-phase model of these flows beats exponential
+recovery and every model that omits repositioning or the source, and a local diffusion term
+adds no predictive power for the depth profile.
 The excess cost of a follow-up market order falls by about 90\% within 250\,ms, during
 repositioning, while total depth is still below normal. The results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
 a state-dependent cancellation rate and a delayed source replace the diffusion term.
@@ -76,12 +78,13 @@ book message in the second after the sweep into additions, cancellations and fil
 against placebo times matched on recent volume, realised variation and book depth.
 
 \paragraph{Findings.} Refill is neither diffusive nor a simple replenishment. It proceeds in
-three ordered phases:
+three phases:
 \begin{enumerate}
-  \item \textbf{Withdrawal} (centroid $\approx$ 50--110\,ms): cancellations of deep orders that
+  \item \textbf{Withdrawal} (from the sweep onward; window centroid $\approx$ 50--110\,ms): cancellations of deep orders that
         are not matched by additions anywhere on the swept side. This is a multi-level version
         of the ``quote fade'' documented for equity market makers by \citet{MalinovaPark2016}.
-  \item \textbf{Repositioning} (centroid $\approx$ 130--360\,ms): depth cancelled deeper in the
+  \item \textbf{Repositioning} (concentrated in the first $\sim$100\,ms, overlapping
+        withdrawal; mean $\approx$ 50\,ms in parametric fits): depth cancelled deeper in the
         book is matched by depth posted within five ticks of the new best quote. It supplies
         74--93\% of the near-touch rebuild in the first 250\,ms, while the ratio of added to
         cancelled depth on the swept side is 0.61--0.73 at 20--40\,ms, against 1.0--1.05 at
@@ -90,12 +93,14 @@ three ordered phases:
         cancellations, but this reflects netting: in a preliminary order-level sample from
         Bitstamp, exact-amount cancel-and-repost moves supply about a quarter of near-touch
         added volume.
-  \item \textbf{Source} (centroid $\approx$ 415--510\,ms): after roughly 140\,ms (ETH) to
+  \item \textbf{Source} (mean $\approx$ 0.4--0.8\,s): after roughly 140\,ms (ETH) to
         140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
         cancellations (ratio 1.09--1.12 against 1.03--1.04): genuinely new liquidity arrives.
 \end{enumerate}
-The ordering is the same for both assets and robust to the definition of the deep book, the
-matching method, sweep size, sweep side and time of day. The
+The structure is the same for both assets and robust to the definition of the deep book, the
+matching method, sweep size, sweep side and time of day, and a parametric three-phase model
+predicts the flows on held-out days better than exponential recovery or any model without
+repositioning or the source (Section~\ref{sec:param}). The
 best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
 
@@ -280,7 +285,56 @@ per 100\,ms; the late source is spread over a long interval, so its integrated m
 Restricting the deep book to $6\leq d\leq 50$ shrinks BTC withdrawal from 0.22 to 0.04 (most of
 it is cancellation of orders stranded more than 50 ticks from the new price) but leaves the
 ordering and the dominance of repositioning before 250\,ms intact (share 0.74 [0.66, 0.83] BTC;
-0.78 [0.73, 0.84] ETH).
+0.78 [0.73, 0.84] ETH). The window centroids of repositioning (322\,ms BTC, 133\,ms ETH) are
+later than the move itself: the per-window split counts any window in which deep depletion and
+near build-up coincide as repositioning, including late windows in which deep cancellations
+continue while new liquidity arrives. Section~\ref{sec:param} shows that this late component
+cannot be attributed from aggregate flows, whereas the identifiable move is an early pulse.
+
+\subsection{Parametric time profiles}
+\label{sec:param}
+To ask which time profile the data support, we fit nine low-dimensional models to the excess
+curves $N(w)$ and $J(w)$ on the 20--1000\,ms windows. Each phase is a rate
+$r(t) = m\,\mathrm{Gamma}(t;k,\theta)$ in time since the sweep, where $k=1$ decays from the
+sweep and $k=2$ is a delayed hump peaking at $\theta$; withdrawal adds to $J$, repositioning to
+both $J$ and $N$ (it conserves depth), and new liquidity to $N$. Parameters are estimated by
+weighted least squares with day-bootstrap standard errors, from many starting points, and
+models are compared by five-fold cross-validation over days and by AIC
+(Table~\ref{tab:fitmodels}, Figure~\ref{fig:fitmodels}).
+
+Three results are robust across assets and both definitions of the deep book. First, the
+exponential recovery of resilience models (model A) fails out of sample (cross-validated $R^2$
+0.40 for BTC, 0.14 for ETH). Second, removing either repositioning (models C and H) or new
+liquidity (D) worsens the fit sharply ($\Delta$AIC 178--407), while the three-phase model E
+predicts held-out days with $R^2$ 0.82 (BTC) and 0.86 (ETH); letting every shape be free
+(F) improves the in-sample fit only, and its parameters run to their bounds. Third, in every
+model that contains it, repositioning is an early pulse: mean 46--53\,ms, peak near 25\,ms,
+moving 0.17 (BTC) and 0.10 (ETH) of pre-sweep depth, so it overlaps withdrawal rather than
+following it. New liquidity has a mean of 0.55\,s (ETH) to 0.78\,s (BTC). Adding a slow
+second component improves the fit for BTC (cross-validated $R^2$ 0.90), but it fits equally
+well as a late withdrawal (G) or a late move (I); aggregate flows cannot tell these apart. For
+ETH, G is preferred and no late move is needed. The fits leave residual structure
+($\chi^2$ about ten times its degrees of freedom), so these profiles summarise the refill but
+do not describe every window.
+
+\begin{table}[ht]
+\centering
+\caption{Parametric models of post-sweep flows. Each phase is a gamma-shaped rate (exponential,
+$k=1$, or delayed hump, $k=2$); $p$: parameters. CV $R^2$: five-fold cross-validation over
+days, relative to predicting zero excess. $\Delta$AIC: relative to the best model for that
+asset (weighted $\chi^2 + 2p$). Deep book $d>5$.}
+\label{tab:fitmodels}
+\resizebox{\textwidth}{!}{\input{tables/fitmodels.tex}}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{figures/fig6_fitmodels.pdf}
+\caption{Excess near build-up and deep depletion per window (points) and fitted rates of the
+three-phase model (E), the three-phase model with a late withdrawal (G), and a model without
+repositioning (C).}
+\label{fig:fitmodels}
+\end{figure}
 
 \subsection{Do the same orders move?}
 Level-2 data carry no order identifiers, but crypto order sizes are fine-grained
@@ -359,9 +413,9 @@ refills a cleared region from its edges. Our evidence instead supports
 \begin{equation}
   \partial_t \rho(x,t) = \int K(x,y,t)\,[\rho(y,t) - \rho(x,t)]\,dy \;-\; \nu(x,t)\,\rho(x,t) \;+\; S(x,t),
 \end{equation}
-with a non-local kernel $K$ active within the first few hundred milliseconds (repositioning), a
+with a non-local kernel $K$ active mainly within the first $\sim$100\,ms (repositioning), a
 state-dependent cancellation rate $\nu$ that spikes immediately after the shock (withdrawal),
-and a delayed source $S$ centred near half a second.
+and a delayed source $S$ centred at 0.4--0.8\,s (Section~\ref{sec:param}).
 
 To test this against the local alternative, we fit discrete versions of both equations to the
 pooled swept-side profile $\rho_k(d)$, $d=1,\dots,50$, at $\tau_k \in
@@ -531,8 +585,9 @@ share, and the timing of the three phases (95\% day-cluster intervals).}
 
 %----------------------------------------------------------------------------------------------
 \section{Conclusion}
-After a multi-level sweep, the crypto perpetual order book refills in three ordered phases:
-liquidity is first pulled, then moved to the new price, and only then made anew. The sequencing
+After a multi-level sweep, the crypto perpetual order book refills in three phases: within the
+first $\sim$100\,ms liquidity is pulled and moved to the new price, and only after
+0.4--0.8\,s is it made anew. The sequencing
 is invisible in aggregate resilience measures and in best-quote studies, and it is inconsistent
 with diffusion-type continuum models at sub-second horizons. For execution, the excess cost
 of a follow-up order falls by about 90\% within 250\,ms, during repositioning, while total

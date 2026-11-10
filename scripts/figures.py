@@ -4,6 +4,7 @@ Fig 1  three-phase refill: withdrawal / transport / source rates vs time, per as
 Fig 2  mass balance: added ÷ cancelled (κ) per window, sweeps vs state-matched placebo.
 Fig 3  moving-frame recovery R(d, τ) heatmap (diverging around R = 1), per asset.
 Fig 5  excess cost of a follow-up market order vs delay, sweeps − matched placebo.
+Fig 6  parametric refill models (fitmodels) against observed excess flows.
 PDFs are also copied to paper/figures/.
 
 Usage: uv run python scripts/figures.py [--assets BTCUSDT,ETHUSDT] [--exchange bybit]
@@ -218,6 +219,41 @@ def fig_execution(res: Path, assets: list[str], out: Path, q_mult: float = 0.1) 
     _save(fig, out, "fig5_execution")
 
 
+def fig_fitmodels(res: Path, assets: list[str], out: Path) -> None:
+    """Observed excess near build-up N and deep depletion J vs parametric fits."""
+    fig, axes = plt.subplots(2, len(assets), figsize=(3.6 * len(assets), 5.0), sharex=True)
+    axes = np.atleast_2d(axes).reshape(2, len(assets))
+    fits = (("E", "three-phase (E)", BLUE, "--"), ("G", "three-phase + late withdrawal (G)",
+            ORANGE, "-"), ("C", "no move phase (C)", AQUA, ":"))  # fmt: skip
+    for col, sym in enumerate(assets):
+        c = pl.read_parquet(res / sym / "fitmodels_curves.parquet")
+        obs = c.filter(pl.col("model") == "obs").sort("t_lo")
+        mid = np.sqrt(obs["t_lo"].to_numpy() * obs["t_hi"].to_numpy())
+        width = obs["t_hi"].to_numpy() - obs["t_lo"].to_numpy()
+        for row, (series, title) in enumerate((("N", "near build-up"), ("J", "deep depletion"))):
+            ax = axes[row, col]
+            ax.plot(mid, obs[series].to_numpy() / width * 100, "o", color=TEXT, markersize=4,
+                    label="observed")  # fmt: skip
+            for m, lab, colour, ls in fits:
+                f = c.filter(pl.col("model") == m).sort("t_lo")
+                ax.plot(mid, f[series].to_numpy() / width * 100, color=colour, linestyle=ls,
+                        label=lab)  # fmt: skip
+            ax.axhline(0, color=TEXT_2, linewidth=0.8)
+            ax.set_xscale("log")
+            ax.xaxis.set_minor_formatter(mpl.ticker.NullFormatter())
+            ax.set_xticks([20, 50, 100, 250, 500, 1000], labels=["20", "50", "100", "250", "500",
+                          "1000"])  # fmt: skip
+            ax.set_title(f"{sym}: {title}")
+            if col == 0:
+                ax.set_ylabel("excess rate per 100 ms\n(fraction of pre depth)")
+            if row == 1:
+                ax.set_xlabel("time since sweep (ms)")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=4, fontsize=8, bbox_to_anchor=(0.5, -0.04))
+    fig.suptitle("Parametric refill models against the data", y=1.01)
+    _save(fig, out, "fig6_fitmodels")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets", default="BTCUSDT,ETHUSDT")
@@ -233,9 +269,11 @@ def main() -> None:
     fig_kappa(res, assets, out)
     fig_recovery(res, assets, out)
     fig_execution(res, assets, out)
+    if all((res / a / "fitmodels_curves.parquet").exists() for a in assets):
+        fig_fitmodels(res, assets, out)
     paper = Path(a.paper_figures)
     paper.mkdir(parents=True, exist_ok=True)
-    for f in out.glob("fig[1235]_*.pdf"):
+    for f in out.glob("fig[12356]_*.pdf"):
         shutil.copy(f, paper / f.name)
     print(f"wrote figures to {out}/ and PDFs to {paper}/")
 

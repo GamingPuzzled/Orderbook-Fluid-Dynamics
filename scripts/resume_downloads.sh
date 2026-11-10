@@ -18,6 +18,7 @@ post() {  # post <exchange> <symbol> <max push ms>: fine flows -> model -> robus
   $UV run lobflow moves --exchange "$1" --symbol "$2" --workers 2 ${=P} > /dev/null 2>> "$LOG"
   $UV run lobflow pde --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
   $UV run lobflow execution --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
+  $UV run lobflow fitmodels --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
   echo "$2 post exit $?" >> "$LOG"
 }
 PHASE="$1"

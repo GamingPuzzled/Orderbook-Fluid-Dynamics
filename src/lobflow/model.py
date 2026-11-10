@@ -282,15 +282,15 @@ def fit_two_phase(
     return per_window, pl.DataFrame(rows)
 
 
-def run_model(
+def load_flow_sums(
     out_dir: Path,
-    results_dir: Path,
     *,
     tag: str = "flowsfine",
-    n_boot: int = 200,
     max_push_ms: float = 20.0,
-) -> str:
-    """Fit the two-phase model for one symbol; write ``model.md`` and parquet tables."""
+    variants: dict[str, Sequence[str]] | None = None,
+) -> tuple[dict[str, tuple[pl.DataFrame, pl.DataFrame]], list[str]]:
+    """Per deep-zone variant: (sweep day×window sums, matched-placebo sums), and the post-sweep
+    window labels (0–20 ms excluded). Placebo weights: within-day CEM (``placebo_weights``)."""
     from lobflow.analysis import load_outputs, placebo_weights
 
     data = load_outputs(out_dir, max_push_ms=max_push_ms)
@@ -314,6 +314,28 @@ def run_model(
     edges = window_edges(labels)
     windows = [f"{int(a)}-{int(b)}" for a, b in zip(edges[:-1], edges[1:], strict=True)]
     post = [x for x in windows if not x.startswith("0-")]  # drop sweep-absorption window
+    variants = variants or {"deep_d_gt_5": DEEP, "deep_d_6_50": ("6-10", "11-20", "21-50")}
+    out = {
+        name: (
+            day_window_sums(s_flows, s_info, None, zones),
+            day_window_sums(p_flows, p_info, w, zones),
+        )
+        for name, zones in variants.items()
+    }
+    return out, post
+
+
+def run_model(
+    out_dir: Path,
+    results_dir: Path,
+    *,
+    tag: str = "flowsfine",
+    n_boot: int = 200,
+    max_push_ms: float = 20.0,
+) -> str:
+    """Fit the two-phase model for one symbol; write ``model.md`` and parquet tables."""
+    sums, post = load_flow_sums(out_dir, tag=tag, max_push_ms=max_push_ms)
+    variants = {"deep_d_gt_5": DEEP, "deep_d_6_50": ("6-10", "11-20", "21-50")}
     results_dir.mkdir(parents=True, exist_ok=True)
     lines = [
         "# Two-phase refill model (transport + withdrawal + delayed source)",
@@ -325,10 +347,8 @@ def run_model(
         "bootstrap CIs. Centroid = mass-weighted mean time; switch = start of first window from "
         "which source > transport in all later windows.",
     ]
-    variants = {"deep_d_gt_5": DEEP, "deep_d_6_50": ("6-10", "11-20", "21-50")}
     for name, zones in variants.items():
-        s_sums = day_window_sums(s_flows, s_info, None, zones)
-        p_sums = day_window_sums(p_flows, p_info, w, zones)
+        s_sums, p_sums = sums[name]
         per_window, summary = fit_two_phase(s_sums, p_sums, post, n_boot=n_boot)
         per_window.write_parquet(results_dir / f"model_windows_{name}.parquet")
         summary.write_parquet(results_dir / f"model_summary_{name}.parquet")

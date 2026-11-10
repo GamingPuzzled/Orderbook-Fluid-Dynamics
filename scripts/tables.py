@@ -244,6 +244,27 @@ def phases(res: Path, assets: list[str], out: Path) -> None:
     (out / "phases.tex").write_text(_rows_tex(head, rows, "l" + "c" * len(assets)))
 
 
+def fitmodels(res: Path, assets: list[str], out: Path) -> None:
+    """Parametric model comparison: parameters, out-of-sample R² and ΔAIC per asset."""
+    tabs = {a: pl.read_parquet(res / a / "fitmodels_scores.parquet") for a in assets}
+    first = tabs[assets[0]]
+    rows = []
+    for r in first.iter_rows(named=True):
+        cells = [r["model"], r["label"], str(r["n_params"])]
+        for a in assets:
+            t = tabs[a]
+            row = t.filter(pl.col("model") == r["model"]).row(0, named=True)
+            cells += [f"{row['cv_r2']:.3f}", f"{row['aic'] - float(t['aic'].to_numpy().min()):.1f}"]
+        rows.append(" & ".join(cells) + " \\\\")
+    head = (
+        " & & & " + " & ".join(f"\\multicolumn{{2}}{{c}}{{{a}}}" for a in assets) + " \\\\\n"
+        + "".join(f"\\cmidrule(lr){{{4 + 2 * i}-{5 + 2 * i}}}" for i in range(len(assets)))
+        + "\nModel & Rates & $p$ & " + " & ".join("CV $R^2$ & $\\Delta$AIC" for _ in assets)
+        + " \\\\"
+    )  # fmt: skip
+    (out / "fitmodels.tex").write_text(_rows_tex(head, rows, "cl" + "c" * (1 + 2 * len(assets))))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets", default="BTCUSDT,ETHUSDT")
@@ -252,9 +273,9 @@ def main() -> None:
     a = ap.parse_args()
     robustness(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
     execution(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
-    for fn in (pde, sample, kappa, phases):
+    for fn in (pde, sample, kappa, phases, fitmodels):
         fn(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
-    print(f"wrote {a.out}/: robustness, execution, pde, sample, kappa, phases")
+    print(f"wrote {a.out}/: robustness, execution, pde, sample, kappa, phases, fitmodels")
 
 
 if __name__ == "__main__":
