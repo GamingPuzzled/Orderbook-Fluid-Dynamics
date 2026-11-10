@@ -541,6 +541,15 @@ exponential recovery of depth miss this ordering: the price for small orders rec
 moving existing liquidity, and depth for large orders recovers only once new liquidity
 arrives.
 
+\section*{Data and code availability}
+The level-2 order book and trade data are the free first-of-month files published by Tardis.dev
+\citep{tardis} for Bybit linear perpetual futures (BTCUSDT, ETHUSDT); they are not
+redistributed, but the code downloads them. The Bitstamp order-level data were recorded from
+Bitstamp's public websocket feed (\texttt{live\_orders\_btcusd}, \texttt{live\_trades\_btcusd}) and
+REST order book snapshots, which require no account. All code, the derived results from which
+every table and figure is generated, and step-by-step reproduction instructions are available
+at \url{https://github.com/GamingPuzzled/Orderbook-Fluid-Dynamics} under the MIT licence.
+
 \bibliographystyle{plainnat}
 \bibliography{references}
 
