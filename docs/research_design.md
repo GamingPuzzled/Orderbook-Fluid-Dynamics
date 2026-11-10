@@ -361,3 +361,17 @@ Withdrawal phase = multi-level "quote fade" (Malinova & Park 2016); cite as prec
   with order IDs, REST snapshot (group=2) on each connect. Coinbase `full` now needs auth.
 - **Literature**: Bonart & Gould 2017 is the closest precedent (best-quote phases); see
   literature_review §13.
+
+### 15.9 Bitstamp order-level (L3) replication (preliminary, 2026-11-10)
+
+- Feed: `live_orders_btcusd` + `live_trades_btcusd`, REST snapshot (group=2) per connection;
+  `lobflow l3` (src/lobflow/l3.py). Re-posts get new order IDs (`order_changed` = partial
+  fill), so moves are matched on exact satoshi amount at a strictly deeper *price*.
+- Replay: snapshot can contain orders deleted before the stream starts; these are pruned when
+  they cross stream-born orders. Residual crossing: ~1% of time, median 2 ms (marketable
+  orders); crossed-book events excluded.
+- 5.2 h, 87 sweeps (≥3 prices, ≥0.5 bps), 1,740 NN-matched placebos (balance ±0.4–0.5).
+  κ(20–40) = 0.77 [0.56, 1.05]. Exact-amount deep→near moves: 43% of near-touch add volume
+  after sweeps (52% placebo); beyond the 2 s time-shift control 24% [17, 31] vs 29% [18, 41].
+  ±1 satoshi control ≈ 0. Conclusion: moves are routine; post-sweep excess undetermined until
+  more data (≈400 sweeps/day).

@@ -232,6 +232,22 @@ def _cmd_pde(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_l3(a: argparse.Namespace) -> int:
+    from lobflow.l3 import run_l3
+
+    text = run_l3(
+        Path(a.raw) / a.pair,
+        Path(a.cache) / a.pair,
+        Path(a.results) / "bitstamp" / a.pair,
+        min_levels=a.min_levels,
+        min_bps=a.min_bps,
+        near_bps=a.near_bps,
+        n_boot=a.n_boot,
+    )
+    print(text)
+    return 0
+
+
 def _cmd_model(a: argparse.Namespace) -> int:
     from lobflow.model import run_model
 
@@ -352,6 +368,17 @@ def build_parser() -> argparse.ArgumentParser:
     pd_.add_argument("--folds", type=int, default=5)
     pd_.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     pd_.set_defaults(fn=_cmd_pde)
+
+    l3p = sub.add_parser("l3", help="Bitstamp order-level (L3) replication and move test")
+    l3p.add_argument("--pair", default="btcusd")
+    l3p.add_argument("--raw", default="data/raw/bitstamp_l3")
+    l3p.add_argument("--cache", default="data/processed/bitstamp_l3")
+    l3p.add_argument("--results", default="results")
+    l3p.add_argument("--min-levels", type=int, default=3)
+    l3p.add_argument("--min-bps", type=float, default=0.5)
+    l3p.add_argument("--near-bps", type=float, default=1.0)
+    l3p.add_argument("--n-boot", type=int, default=500)
+    l3p.set_defaults(fn=_cmd_l3)
 
     ro = sub.add_parser("robustness", help="matching comparison and subset robustness table")
     ro.add_argument("--exchange", required=True)

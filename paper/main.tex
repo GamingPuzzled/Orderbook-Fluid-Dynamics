@@ -321,9 +321,22 @@ near-touch addition volume; ETH 1.4\% vs 0.4\%), so linked cancel-and-repost pai
 But they cover only about 1\% of near-touch additions and are no more frequent after sweeps than
 at matched placebo times. The test has limited power: each 20\,ms message nets all changes at a
 price, which hides moves at busy levels, and post-sweep levels are the busiest. We therefore
-interpret repositioning as a depth-conserving reallocation in aggregate flows, carried mostly by
-resized or different orders rather than identical orders hopping toward the touch.
-Order-level data with identifiers are needed to settle the point (Section~\ref{sec:robust}).
+interpret repositioning as a depth-conserving reallocation in aggregate flows.
+
+Order-level data show that the low Bybit match rate reflects netting rather than the absence of
+moves. In a preliminary 5.2-hour sample of Bitstamp's public BTC/USD order feed (4.7 million
+order events, each with its own identifier and millisecond timestamp, so nothing is netted), a
+re-posted order receives a new identifier, but its amount is exact to the satoshi. Within 1\,bp
+of the opposite quote, 43\% of added volume in the second after a sweep (52\% at
+state-matched placebo times) has a cancellation of the identical amount at a strictly deeper
+price within 100\,ms. A one-satoshi-off control matches almost nothing, and a control
+that repeats the rule against cancellations 2\,s later, which absorbs market makers' habit of
+reusing quote sizes, removes about half; the remaining 24\% (95\% CI 17--31\%) after sweeps
+and 29\% (18--41\%) at placebo times are cancel-and-repost moves toward the touch. Moving
+existing orders is therefore a routine way of supplying near-touch liquidity, not a rare
+event. With only 87 sweeps, this sample cannot yet say whether moves intensify after sweeps;
+the post-sweep dip in additions relative to cancellations does replicate in direction
+($\kappa_{20\text{--}40}=0.77$, CI 0.56--1.05). \todo{Update with the full Bitstamp sample.}
 
 %----------------------------------------------------------------------------------------------
 \section{Implications for continuum models}
@@ -470,9 +483,10 @@ grid; 95\% day-cluster bootstrap intervals (100 replications) in brackets.}
 \begin{itemize}
   \item \textbf{Level-2 data.} Without order identifiers we cannot show that the \emph{same}
         orders move; repositioning is identified from matched aggregate cancellation and
-        addition flows, and exact-size tracing finds few identical moves. We are recording
-        Bitstamp's public order-level feed, which carries order identifiers and in-place order
-        changes, to test this directly. \todo{Bitstamp order-level results.}
+        addition flows. Bitstamp's order-level feed shows that exact-amount cancel-and-repost
+        moves supply about a quarter of near-touch added volume, but that sample is short
+        (5.2 hours, 87 sweeps), on a spot venue, and its placebo matching is imperfect
+        (standardised differences up to 0.5).
   \item \textbf{Push netting.} Each 20\,ms message nets changes at a price, so gross flows are
         lower bounds.
   \item \textbf{Fill matching.} About one third of sweep volume exceeds the displayed size at
