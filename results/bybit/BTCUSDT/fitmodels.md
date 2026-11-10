@@ -1,6 +1,6 @@
 # Parametric refill models: out-of-sample comparison
 
-Data: excess near build-up N(w) and deep depletion J(w) per window, 20–1000 ms (10 windows × 2 series), deep book d > 5, state-matched placebo. Rates are gamma pulses (k = 1: exponential from the sweep; k = 2: delayed hump). Weighted least squares with day-bootstrap standard errors; CV: 5 folds over days. Lower cv_chi2 / AIC / BIC is better; cv_r2 is out-of-sample R² relative to predicting zero.
+Data: excess near build-up N(w) and deep depletion J(w) per window, 20–1000 ms (10 windows × 2 series), deep book d > 5, state-matched placebo. Rates are gamma pulses (k = 1: exponential from the sweep; k = 2: delayed hump). Weighted least squares with day-bootstrap standard errors; CV: 5 folds over days. Lower cv_chi2 / AIC / BIC is better; cv_r2 is out-of-sample R² relative to predicting zero. K, K3, P: Hawkes-type impulse responses. Q, Q+: queue-reactive benchmarks given the observed book state at each window start (params = binned intensity values; no AIC/BIC).
 
 | model | description | params | χ² | AIC | BIC | in-sample R² | CV χ² | CV R² |
 |---|---|---|---|---|---|---|---|---|
@@ -13,6 +13,11 @@ Data: excess near build-up N(w) and deep depletion J(w) per window, 20–1000 ms
 | G | three-phase + late withdrawal | 8 | 82.1 | 98.1 | 106.1 | 0.970 | 882.5 | 0.903 |
 | H | early + late withdrawal + delayed source (no move) | 6 | 430.4 | 442.4 | 448.4 | 0.563 | 2797.2 | 0.564 |
 | I | three-phase + late move | 8 | 81.3 | 97.3 | 105.2 | 0.971 | 877.3 | 0.904 |
+| K | linear Hawkes, exponential kernels (2 modes) | 6 | 102.0 | 114.0 | 119.9 | 0.964 | 960.0 | 0.902 |
+| K3 | linear Hawkes, exponential kernels (3 modes) | 9 | 86.6 | 104.6 | 113.6 | 0.967 | 896.0 | 0.899 |
+| P | Hawkes-type power-law decay | 6 | 233.2 | 245.2 | 251.2 | 0.818 | 1559.1 | 0.785 |
+| Q | queue-reactive, calibrated on placebo times | 288 | 895.5 | – | – | 0.532 | 5095.6 | 0.454 |
+| Q+ | queue-reactive, calibrated on placebo + sweep windows | 288 | 1478.5 | – | – | -0.237 | 8480.2 | -0.407 |
 
 Best by cross-validated χ²: **I**.
 
@@ -51,7 +56,7 @@ Best by cross-validated χ²: **I**.
 | E | S_peak_ms | 387 | [320, 474] |
 | E | S_mean_ms | 775 | [641, 949] |
 | F | W_mass | 0.439 | [0.323, 0.544] |
-| F | W_peak_ms | 11.3 | [1.86e-13, 33.1] |
+| F | W_peak_ms | 11.3 | [1.68e-13, 33.1] |
 | F | W_mean_ms | 47.4 | [40.4, 58.7] |
 | F | W_k | 1.31 | [1, 2.27] |
 | F | T_mass | 1.55 | [0.571, 2.41] |
@@ -95,3 +100,24 @@ Best by cross-validated χ²: **I**.
 | I | S_mass | 0.309 | [0.273, 0.347] |
 | I | S_peak_ms | 267 | [232, 346] |
 | I | S_mean_ms | 533 | [463, 693] |
+| K | H1_aN | 0.182 | [0.155, 0.21] |
+| K | H1_aJ | 0.535 | [0.48, 0.584] |
+| K | H1_tau_ms | 45.7 | [40, 50.1] |
+| K | H2_aN | 2.4 | [1.26, 2.76] |
+| K | H2_aJ | 0.995 | [0.516, 1.42] |
+| K | H2_tau_ms | 5e+03 | [2.1e+03, 5e+03] |
+| K3 | H1_aN | 1.91 | [1.53, 2.58] |
+| K3 | H1_aJ | 3 | [2.8, 3] |
+| K3 | H1_tau_ms | 83 | [65.4, 93.7] |
+| K3 | H2_aN | -1.9 | [-2.58, -1.5] |
+| K3 | H2_aJ | -2.61 | [-2.77, -2.32] |
+| K3 | H2_tau_ms | 95.9 | [71.6, 116] |
+| K3 | H3_aN | 0.874 | [0.734, 1.8] |
+| K3 | H3_aJ | 0.426 | [0.283, 0.915] |
+| K3 | H3_tau_ms | 857 | [493, 2.34e+03] |
+| P | PN_mass | 3 | [2.55, 3] |
+| P | PN_c_ms | 47.1 | [20.5, 115] |
+| P | PN_beta | 0.0605 | [0.05, 0.0932] |
+| P | PJ_mass | 0.73 | [0.58, 1.38] |
+| P | PJ_c_ms | 47.6 | [2.81, 273] |
+| P | PJ_beta | 1.36 | [0.335, 5] |

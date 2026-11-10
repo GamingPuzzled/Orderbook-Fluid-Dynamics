@@ -34,8 +34,10 @@ near-touch rebuild in the first 250\,ms while total depth on the swept side \emp
 (additions/cancellations $=0.61$--$0.73$ at 20--40\,ms against $\approx 1.0$ in matched
 placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred at roughly
 0.4--0.8\,s. Out of sample, a parametric three-phase model of these flows beats exponential
-recovery and every model that omits repositioning or the source, and a local diffusion term
-adds no predictive power for the depth profile.
+recovery and every model that omits repositioning or the source; a queue-reactive benchmark,
+in which flows depend only on the current state of the book, fails, so time since the sweep
+matters beyond the book's state; and a local diffusion term adds no predictive power for the
+depth profile.
 The excess cost of a follow-up market order falls by about 90\% within 250\,ms, during
 repositioning, while total depth is still below normal. The results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
 a state-dependent cancellation rate and a delayed source replace the diffusion term.
@@ -293,7 +295,8 @@ cannot be attributed from aggregate flows, whereas the identifiable move is an e
 
 \subsection{Parametric time profiles}
 \label{sec:param}
-To ask which time profile the data support, we fit nine low-dimensional models to the excess
+To ask which time profile the data support, we fit nine low-dimensional phase models, three
+Hawkes-type response functions and two queue-reactive benchmarks to the excess
 curves $N(w)$ and $J(w)$ on the 20--1000\,ms windows. Each phase is a rate
 $r(t) = m\,\mathrm{Gamma}(t;k,\theta)$ in time since the sweep, where $k=1$ decays from the
 sweep and $k=2$ is a delayed hump peaking at $\theta$; withdrawal adds to $J$, repositioning to
@@ -305,7 +308,8 @@ models are compared by five-fold cross-validation over days and by AIC
 Three results are robust across assets and both definitions of the deep book. First, the
 exponential recovery of resilience models (model A) fails out of sample (cross-validated $R^2$
 0.40 for BTC, 0.14 for ETH). Second, removing either repositioning (models C and H) or new
-liquidity (D) worsens the fit sharply ($\Delta$AIC 178--407), while the three-phase model E
+liquidity (D) worsens the fit sharply ($\Delta$AIC 178--407 relative to the best phase
+model), while the three-phase model E
 predicts held-out days with $R^2$ 0.82 (BTC) and 0.86 (ETH); letting every shape be free
 (F) improves the in-sample fit only, and its parameters run to their bounds. Third, in every
 model that contains it, repositioning is an early pulse: mean 46--53\,ms, peak near 25\,ms,
@@ -317,10 +321,39 @@ ETH, G is preferred and no late move is needed. The fits leave residual structur
 ($\chi^2$ about ten times its degrees of freedom), so these profiles summarise the refill but
 do not describe every window.
 
+\paragraph{Benchmarks from the order-flow literature.} In a linear Hawkes model of additions
+and cancellations with exponential kernels, the expected response to a shock is a sum of
+decaying exponentials, one per eigenmode of the kernel matrix, with loadings of either sign
+\citep{bacry2015hawkes}. Fitting two such modes with free signed loadings on $N$ and $J$
+(model K, six parameters) predicts held-out days about as well as the best phase models
+(cross-validated $R^2$ 0.90 for BTC and 0.84 for ETH, against 0.90 and 0.88); three modes
+(K3) give 0.90 and 0.87. A power-law decay of the kind typical of fitted Hawkes kernels (P)
+does worse (0.79 and 0.85). The Hawkes fit is not a rival explanation: its two modes recover
+the same two time scales. The fast mode (time constant 46\,ms for BTC, 28\,ms for ETH)
+depletes the deep book and builds near depth by 0.18 (BTC) and 0.10 (ETH) of pre-sweep depth,
+close to the repositioning masses of the phase models (0.17 and 0.10); the slow mode
+(0.6\,s for ETH; for BTC it runs to the bound, a near-constant rate over the window) builds
+near depth, the source. A response function alone cannot say which part of the fast mode is
+a move and which a withdrawal; that split comes from the mass balance of
+Section~\ref{sec:results}.
+
+A queue-reactive model \citep{huang2015queue} makes the opposite assumption: flows depend on
+the current queue sizes only. We bin windows by near ($d \le 5$) and deep ($6 \le d \le 50$)
+depth at the start of each window, scaled by the day's median placebo depth, and predict each
+sweep window's flows from the mean flow rate in its cell, given the \emph{observed} book state
+at the window start; this one-step-ahead forecast is generous to the benchmark. Calibrated on
+placebo times (Q), it predicts held-out days with $R^2$ of only 0.45 (BTC) and 0.10 (ETH);
+calibrated on placebo and sweep windows together (Q+), 0.04 for ETH and below zero for BTC.
+The book's state does not determine post-sweep flows: right after a sweep, deep orders are
+cancelled faster than at a normal time with equally thin queues, and near depth is rebuilt
+faster too. Refill depends on time since the sweep.
+
 \begin{table}[ht]
 \centering
-\caption{Parametric models of post-sweep flows. Each phase is a gamma-shaped rate (exponential,
-$k=1$, or delayed hump, $k=2$); $p$: parameters. CV $R^2$: five-fold cross-validation over
+\caption{Parametric models of post-sweep flows. A--I: each phase is a gamma-shaped rate
+(exponential, $k=1$, or delayed hump, $k=2$). K, K3: linear-Hawkes responses (sums of
+exponential modes with signed loadings). P: power-law decay. Q, Q+: queue-reactive benchmarks
+given the observed book state (non-parametric: no $p$ or AIC). $p$: parameters. CV $R^2$: five-fold cross-validation over
 days, relative to predicting zero excess. $\Delta$AIC: relative to the best model for that
 asset (weighted $\chi^2 + 2p$). Deep book $d>5$.}
 \label{tab:fitmodels}
@@ -486,7 +519,9 @@ arrivals and cancellations as self- and cross-exciting
 \citep{bacry2015hawkes,rambaldi2017volume,lu2018highdim} or as functions of queue sizes
 \citep{huang2015queue}. They usually model event timing at the best limits or a few levels.
 Our decomposition is complementary: it measures where in the depth profile cancellations and
-additions occur after a shock, which constrains how such models should couple levels.
+additions occur after a shock, which constrains how such models should couple levels. In
+Section~\ref{sec:param}, a linear-Hawkes response reproduces the two post-sweep time scales,
+while a queue-reactive benchmark, in which flows depend only on queue sizes, fails.
 
 \paragraph{Order flow around market orders.} \citet{bonart2017latency} study net order flow at
 the best quotes of five Nasdaq stocks before and after market orders and identify a sequence

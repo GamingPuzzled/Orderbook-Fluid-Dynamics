@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 
 COLS = (  # (stat, digits)
@@ -250,11 +251,13 @@ def fitmodels(res: Path, assets: list[str], out: Path) -> None:
     first = tabs[assets[0]]
     rows = []
     for r in first.iter_rows(named=True):
-        cells = [r["model"], r["label"], str(r["n_params"])]
+        bench = bool(np.isnan(r["aic"]))  # non-parametric benchmark: no p, no AIC
+        cells = [r["model"], r["label"], "--" if bench else str(r["n_params"])]
         for a in assets:
             t = tabs[a]
             row = t.filter(pl.col("model") == r["model"]).row(0, named=True)
-            cells += [f"{row['cv_r2']:.3f}", f"{row['aic'] - float(t['aic'].to_numpy().min()):.1f}"]
+            d_aic = "--" if bench else f"{row['aic'] - float(np.nanmin(t['aic'].to_numpy())):.1f}"
+            cells += [f"{row['cv_r2']:.3f}", d_aic]
         rows.append(" & ".join(cells) + " \\\\")
     head = (
         " & & & " + " & ".join(f"\\multicolumn{{2}}{{c}}{{{a}}}" for a in assets) + " \\\\\n"

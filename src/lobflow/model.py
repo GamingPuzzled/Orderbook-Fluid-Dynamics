@@ -282,15 +282,24 @@ def fit_two_phase(
     return per_window, pl.DataFrame(rows)
 
 
-def load_flow_sums(
-    out_dir: Path,
-    *,
-    tag: str = "flowsfine",
-    max_push_ms: float = 20.0,
-    variants: dict[str, Sequence[str]] | None = None,
-) -> tuple[dict[str, tuple[pl.DataFrame, pl.DataFrame]], list[str]]:
-    """Per deep-zone variant: (sweep day×window sums, matched-placebo sums), and the post-sweep
-    window labels (0–20 ms excluded). Placebo weights: within-day CEM (``placebo_weights``)."""
+@dataclass(frozen=True)
+class FlowFrames:
+    """Per-event post-sweep flows for the main sample (ids made unique per day)."""
+
+    s_flows: pl.DataFrame
+    s_info: pl.DataFrame
+    p_flows: pl.DataFrame
+    p_info: pl.DataFrame
+    w: pl.DataFrame  # placebo weights (event_id, w)
+    windows: list[str]  # all window labels, sorted
+    post: list[str]  # windows after the sweep-absorption window
+    days: list[str]
+
+
+def load_flow_frames(
+    out_dir: Path, *, tag: str = "flowsfine", max_push_ms: float = 20.0
+) -> FlowFrames:
+    """Sweeps with ≥ 95% of the gap cleared, their flows, and CEM-weighted placebo flows."""
     from lobflow.analysis import load_outputs, placebo_weights
 
     data = load_outputs(out_dir, max_push_ms=max_push_ms)
@@ -310,19 +319,31 @@ def load_flow_sums(
     s_info = s_info.filter(pl.col("event_id").is_in(keep.implode()))
     p_flows, p_info = load(f"{tag}_placebo"), load(f"{tag}_placebo_info")
     w, _ = placebo_weights(data["state"], data["flows_info"], data["flows_placebo_info"])
-    labels = s_flows["window"].unique().to_list()
-    edges = window_edges(labels)
+    edges = window_edges(s_flows["window"].unique().to_list())
     windows = [f"{int(a)}-{int(b)}" for a, b in zip(edges[:-1], edges[1:], strict=True)]
     post = [x for x in windows if not x.startswith("0-")]  # drop sweep-absorption window
+    return FlowFrames(s_flows, s_info, p_flows, p_info, w, windows, post, days_ok)
+
+
+def load_flow_sums(
+    out_dir: Path,
+    *,
+    tag: str = "flowsfine",
+    max_push_ms: float = 20.0,
+    variants: dict[str, Sequence[str]] | None = None,
+) -> tuple[dict[str, tuple[pl.DataFrame, pl.DataFrame]], list[str]]:
+    """Per deep-zone variant: (sweep day×window sums, matched-placebo sums), and the post-sweep
+    window labels (0–20 ms excluded). Placebo weights: within-day CEM (``placebo_weights``)."""
+    fr = load_flow_frames(out_dir, tag=tag, max_push_ms=max_push_ms)
     variants = variants or {"deep_d_gt_5": DEEP, "deep_d_6_50": ("6-10", "11-20", "21-50")}
     out = {
         name: (
-            day_window_sums(s_flows, s_info, None, zones),
-            day_window_sums(p_flows, p_info, w, zones),
+            day_window_sums(fr.s_flows, fr.s_info, None, zones),
+            day_window_sums(fr.p_flows, fr.p_info, fr.w, zones),
         )
         for name, zones in variants.items()
     }
-    return out, post
+    return out, fr.post
 
 
 def run_model(

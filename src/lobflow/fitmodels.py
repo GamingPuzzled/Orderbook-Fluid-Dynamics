@@ -14,7 +14,20 @@ density times a mass, r(t) = m · Gamma(t; k, θ):
 so that  N(w) = ∫_w (r_T + r_S),   J(w) = ∫_w (r_W + r_T).
 
 Shape k = 1 is an exponential decay starting at the sweep; k = 2 is a delayed hump peaking at
-θ. Models are fitted by weighted least squares (weights: day-bootstrap standard errors of each
+θ.
+
+Benchmarks from the order-flow literature:
+
+- Linear Hawkes, exponential kernels (``H`` modes): the expected response of add/cancel
+  intensities to an exogenous shock is a sum of decaying exponentials, one per eigenmode of the
+  kernel matrix, with loadings of either sign. Each ``H`` mode has its own time scale and
+  signed loadings on N and J (a difference of two modes can produce a delayed hump).
+- Power-law kernels (``PN``/``PJ``): rate m · β/c · (1 + t/c)^-(1+β) for N and for J
+  separately, the slow decay typical of fitted Hawkes kernels in order books.
+- Queue-reactive (Huang, Lehalle & Rosenbaum 2015): flows depend on the current queue sizes
+  only, not on time since the sweep; see ``queuereactive.py``.
+
+Models are fitted by weighted least squares (weights: day-bootstrap standard errors of each
 window's N and J) with many starting points, and compared by 5-fold cross-validation over days
 (out-of-sample weighted error), AIC/BIC, and bootstrap stability of their parameters.
 """
@@ -25,6 +38,7 @@ import itertools
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -37,12 +51,27 @@ THETA_BOUNDS = (2.0, 5000.0)  # ms
 K_BOUNDS = (1.0, 8.0)
 M_MAX = 3.0
 THETA_STARTS = (30.0, 100.0, 300.0, 1000.0)
+BETA_BOUNDS = (0.05, 5.0)
+GAMMA_KINDS = ("W", "W2", "T", "T2", "S")
+N_KINDS = ("T", "T2", "S")
+J_KINDS = ("W", "W2", "T", "T2")
 
 
 @dataclass(frozen=True)
 class Component:
-    kind: str  # "W", "T" or "S"
-    k: float | None  # fixed gamma shape, or None = free
+    """One rate term. Gamma kinds (W, W2, T, T2, S): mass ≥ 0, scale θ, shape k (fixed or
+    free, ``k=None``). ``H1``/``H2``: Hawkes exponential mode, signed loadings on N and J and a
+    shared θ (``k`` unused). ``PN``/``PJ``: power-law (Lomax) rate, signed mass, scale c and
+    tail exponent β, on N or J only (``k`` unused)."""
+
+    kind: str
+    k: float | None = 1.0
+
+    @property
+    def n_params(self) -> int:
+        if self.kind in GAMMA_KINDS:
+            return 3 if self.k is None else 2
+        return 3
 
 
 @dataclass(frozen=True)
@@ -53,7 +82,7 @@ class Model:
 
     @property
     def n_params(self) -> int:
-        return sum(3 if c.k is None else 2 for c in self.comps)
+        return sum(c.n_params for c in self.comps)
 
 
 MODELS: tuple[Model, ...] = (
@@ -86,57 +115,109 @@ MODELS: tuple[Model, ...] = (
         "three-phase + late move",
         (Component("W", 1.0), Component("T", 2.0), Component("T2", 2.0), Component("S", 2.0)),
     ),
+    Model("K", "linear Hawkes, exponential kernels (2 modes)", (Component("H1"), Component("H2"))),
+    Model(
+        "K3",
+        "linear Hawkes, exponential kernels (3 modes)",
+        (Component("H1"), Component("H2"), Component("H3")),
+    ),
+    Model("P", "Hawkes-type power-law decay", (Component("PN"), Component("PJ"))),
 )
 
 
-def unpack(model: Model, x: F64) -> list[tuple[str, float, float, float]]:
-    """Parameter vector -> [(kind, mass, k, theta)]."""
-    out, i = [], 0
+def unpack(model: Model, x: F64) -> list[tuple[str, tuple[float, ...]]]:
+    """Parameter vector -> [(kind, natural parameters)]: gamma (m, k, θ); H (a_N, a_J, θ);
+    P (m, c, β)."""
+    out: list[tuple[str, tuple[float, ...]]] = []
+    i = 0
     for c in model.comps:
-        m, th = float(x[i]), float(np.exp(x[i + 1]))
-        i += 2
-        if c.k is None:
-            k = float(x[i])
-            i += 1
+        if c.kind in GAMMA_KINDS:
+            m, th = float(x[i]), float(np.exp(x[i + 1]))
+            i += 2
+            if c.k is None:
+                k = float(x[i])
+                i += 1
+            else:
+                k = c.k
+            out.append((c.kind, (m, k, th)))
+        elif c.kind.startswith("H"):
+            out.append((c.kind, (float(x[i]), float(x[i + 1]), float(np.exp(x[i + 2])))))
+            i += 3
         else:
-            k = c.k
-        out.append((c.kind, m, k, th))
+            out.append((c.kind, (float(x[i]), float(np.exp(x[i + 1])), float(x[i + 2]))))
+            i += 3
     return out
+
+
+def _lomax_cdf(t: F64, c: float, beta: float) -> F64:
+    return np.asarray(1.0 - (1.0 + np.maximum(t, 0.0) / c) ** (-beta), dtype=np.float64)
 
 
 def predict(model: Model, x: F64, edges: F64) -> tuple[F64, F64]:
     """Window integrals (N, J) for windows between consecutive ``edges`` (ms)."""
     n = np.zeros(len(edges) - 1)
     j = np.zeros(len(edges) - 1)
-    for kind, m, k, th in unpack(model, x):
-        mass = m * np.diff(stats.gamma.cdf(edges, k, scale=th))
-        if kind in ("T", "T2", "S"):
-            n += mass
-        if kind in ("W", "W2", "T", "T2"):
-            j += mass
+    for kind, par in unpack(model, x):
+        if kind in GAMMA_KINDS:
+            m, k, th = par
+            mass = m * np.diff(stats.gamma.cdf(edges, k, scale=th))
+            if kind in N_KINDS:
+                n += mass
+            if kind in J_KINDS:
+                j += mass
+        elif kind.startswith("H"):
+            a_n, a_j, th = par
+            shape = np.diff(stats.expon.cdf(edges, scale=th))
+            n += a_n * shape
+            j += a_j * shape
+        else:
+            m, c_, beta = par
+            mass = m * np.diff(_lomax_cdf(edges, c_, beta))
+            if kind == "PN":
+                n += mass
+            else:
+                j += mass
     return n, j
 
 
+_H_LOADINGS = ((0.1, 0.1), (0.2, -0.1), (-0.1, 0.2), (-0.1, -0.1))
+
+
 def _starts(model: Model) -> list[F64]:
-    starts = []
-    for ths in itertools.product(THETA_STARTS, repeat=len(model.comps)):
-        x: list[float] = []
-        for c, th in zip(model.comps, ths, strict=True):
-            x += [0.1, float(np.log(th))]
-            if c.k is None:
-                x.append(2.0)
-        starts.append(np.array(x))
-    return starts
+    per_comp: list[list[list[float]]] = []
+    for c in model.comps:
+        opts: list[list[float]] = []
+        for th in THETA_STARTS:
+            lt = float(np.log(th))
+            if c.kind in GAMMA_KINDS:
+                opts.append([0.1, lt] + ([2.0] if c.k is None else []))
+            elif c.kind.startswith("H"):
+                opts += [[a, b, lt] for a, b in _H_LOADINGS]
+            else:
+                opts += [[0.1, lt, beta] for beta in (0.5, 1.5)]
+        per_comp.append(opts)
+    combos = list(itertools.product(*per_comp))
+    if len(combos) > 400:  # thin large grids deterministically
+        combos = combos[:: len(combos) // 400 + 1]
+    return [np.array([v for part in combo for v in part]) for combo in combos]
 
 
 def _bounds(model: Model) -> tuple[list[float], list[float]]:
     lo, hi = [], []
+    lt = (float(np.log(THETA_BOUNDS[0])), float(np.log(THETA_BOUNDS[1])))
     for c in model.comps:
-        lo += [0.0, float(np.log(THETA_BOUNDS[0]))]
-        hi += [M_MAX, float(np.log(THETA_BOUNDS[1]))]
-        if c.k is None:
-            lo.append(K_BOUNDS[0])
-            hi.append(K_BOUNDS[1])
+        if c.kind in GAMMA_KINDS:
+            lo += [0.0, lt[0]]
+            hi += [M_MAX, lt[1]]
+            if c.k is None:
+                lo.append(K_BOUNDS[0])
+                hi.append(K_BOUNDS[1])
+        elif c.kind.startswith("H"):
+            lo += [-M_MAX, -M_MAX, lt[0]]
+            hi += [M_MAX, M_MAX, lt[1]]
+        else:
+            lo += [-M_MAX, lt[0], BETA_BOUNDS[0]]
+            hi += [M_MAX, lt[1], BETA_BOUNDS[1]]
     return lo, hi
 
 
@@ -206,14 +287,36 @@ def boot_sigma(
 # ---------------------------------------------------------------- comparison
 
 
+class Benchmark(Protocol):
+    """A non-parametric competitor: predicts the excess (N, J) pooled over ``test_days``
+    after calibrating on ``train_days`` (e.g. ``queuereactive.QueueReactive``)."""
+
+    label: str
+    n_params: int
+
+    def __call__(self, train_days: Sequence[str], test_days: Sequence[str]) -> tuple[F64, F64]: ...
+
+
 def describe(model: Model, x: F64) -> dict[str, float]:
-    """Interpretable quantities: per component mass, peak time and mean time (ms)."""
+    """Interpretable quantities per component: gamma (mass, peak, mean, k); Hawkes mode
+    (loadings on N and J, time scale); power law (mass, scale c, exponent β)."""
     out: dict[str, float] = {}
-    for kind, m, k, th in unpack(model, x):
-        out[f"{kind}_mass"] = m
-        out[f"{kind}_peak_ms"] = (k - 1) * th
-        out[f"{kind}_mean_ms"] = k * th
-        out[f"{kind}_k"] = k
+    comps = unpack(model, x)
+    # Hawkes modes are exchangeable: name them by increasing time scale (no label switching)
+    modes = sorted((par for kind, par in comps if kind.startswith("H")), key=lambda p: p[2])
+    comps = [c for c in comps if not c[0].startswith("H")]
+    comps += [(f"H{i + 1}", par) for i, par in enumerate(modes)]
+    for kind, par in comps:
+        if kind in GAMMA_KINDS:
+            m, k, th = par
+            out[f"{kind}_mass"] = m
+            out[f"{kind}_peak_ms"] = (k - 1) * th
+            out[f"{kind}_mean_ms"] = k * th
+            out[f"{kind}_k"] = k
+        elif kind.startswith("H"):
+            out[f"{kind}_aN"], out[f"{kind}_aJ"], out[f"{kind}_tau_ms"] = par
+        else:
+            out[f"{kind}_mass"], out[f"{kind}_c_ms"], out[f"{kind}_beta"] = par
     return out
 
 
@@ -223,13 +326,15 @@ def compare(
     windows: Sequence[str],
     *,
     models: Sequence[Model] = MODELS,
+    benchmarks: dict[str, Benchmark] | None = None,
     n_folds: int = 5,
     n_boot_sigma: int = 200,
     n_boot_params: int = 100,
     seed: int = 0,
 ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, tuple[F64, F64, F64, F64]]]:
     """Returns (scores per model, parameter table with bootstrap CIs, curves for plotting:
-    model -> (edges, N_fit, J_fit, unused)); observed curves under key ``"obs"``."""
+    model -> (edges, N_fit, J_fit, unused)); observed curves under key ``"obs"``.
+    ``benchmarks`` are scored on the same folds and weights (no AIC/BIC: not parametric)."""
     from lobflow.model import window_edges
 
     days = sorted(set(s_sums["day"].to_list()))
@@ -296,7 +401,40 @@ def compare(
                     "hi": float(np.percentile(d, 97.5)),
                 }
             )
+    sig = np.concatenate([sig_n, sig_j])
+    for name, bench in (benchmarks or {}).items():
+        n_fit, j_fit = bench(days, days)
+        curves[name] = (edges, n_fit, j_fit, np.zeros(0))
+        res_in = np.concatenate([n_fit - n_obs, j_fit - j_obs])
+        cv_chi2, cv_sse, cv_ss0 = 0.0, 0.0, 0.0
+        for test_idx in folds:
+            test = [days[i] for i in test_idx]
+            train = [d for d in days if d not in set(test)]
+            pn, pj = bench(train, test)
+            on, oj = excess_curves(s_sums, p_sums, windows, test)
+            res = np.concatenate([pn - on, pj - oj])
+            cv_chi2 += float(((res / sig) ** 2).sum())
+            cv_sse += float((res**2).sum())
+            cv_ss0 += float((np.concatenate([on, oj]) ** 2).sum())
+        chi2 = float(((res_in / sig) ** 2).sum())
+        rows.append(
+            {
+                "model": name,
+                "label": bench.label,
+                "n_params": bench.n_params,
+                "chi2": chi2,
+                "aic": float("nan"),
+                "bic": float("nan"),
+                "r2_in": 1 - float((res_in**2).sum()) / ss0,
+                "cv_chi2": cv_chi2,
+                "cv_r2": 1 - cv_sse / cv_ss0,
+            }
+        )
     return pl.DataFrame(rows), pl.DataFrame(prow), curves
+
+
+def _fmt(v: float) -> str:
+    return "–" if np.isnan(v) else f"{v:.1f}"
 
 
 def run_fitmodels(
@@ -308,13 +446,17 @@ def run_fitmodels(
     n_boot_params: int = 100,
 ) -> str:
     """Model comparison for one symbol (deep book d > 5); writes ``fitmodels.md`` + parquet."""
-    from lobflow.model import DEEP, load_flow_sums
+    from lobflow.model import DEEP, day_window_sums, load_flow_frames
+    from lobflow.queuereactive import benchmarks as qr_benchmarks
 
-    sums, post = load_flow_sums(
-        out_dir, tag=tag, max_push_ms=max_push_ms, variants={"deep_d_gt_5": DEEP}
+    fr = load_flow_frames(out_dir, tag=tag, max_push_ms=max_push_ms)
+    post = fr.post
+    s_sums = day_window_sums(fr.s_flows, fr.s_info, None, DEEP)
+    p_sums = day_window_sums(fr.p_flows, fr.p_info, fr.w, DEEP)
+    q, q_plus = qr_benchmarks(out_dir, fr, p_sums)
+    scores, params, curves = compare(
+        s_sums, p_sums, post, benchmarks={"Q": q, "Q+": q_plus}, n_boot_params=n_boot_params
     )
-    s_sums, p_sums = sums["deep_d_gt_5"]
-    scores, params, curves = compare(s_sums, p_sums, post, n_boot_params=n_boot_params)
     results_dir.mkdir(parents=True, exist_ok=True)
     scores.write_parquet(results_dir / "fitmodels_scores.parquet")
     params.write_parquet(results_dir / "fitmodels_params.parquet")
@@ -334,13 +476,15 @@ def run_fitmodels(
         f"({len(post)} windows × 2 series), deep book d > 5, state-matched placebo. Rates are "
         "gamma pulses (k = 1: exponential from the sweep; k = 2: delayed hump). Weighted least "
         "squares with day-bootstrap standard errors; CV: 5 folds over days. Lower cv_chi2 / "
-        "AIC / BIC is better; cv_r2 is out-of-sample R² relative to predicting zero.",
+        "AIC / BIC is better; cv_r2 is out-of-sample R² relative to predicting zero. K, K3, P: "
+        "Hawkes-type impulse responses. Q, Q+: queue-reactive benchmarks given the observed book "
+        "state at each window start (params = binned intensity values; no AIC/BIC).",
         "",
         "| model | description | params | χ² | AIC | BIC | in-sample R² | CV χ² | CV R² |",
         "|---|---|---|---|---|---|---|---|---|",
         *[
             f"| {r['model']} | {r['label']} | {r['n_params']} | {r['chi2']:.1f} | "
-            f"{r['aic']:.1f} | {r['bic']:.1f} | {r['r2_in']:.3f} | {r['cv_chi2']:.1f} | "
+            f"{_fmt(r['aic'])} | {_fmt(r['bic'])} | {r['r2_in']:.3f} | {r['cv_chi2']:.1f} | "
             f"{r['cv_r2']:.3f} |"
             for r in scores.iter_rows(named=True)
         ],

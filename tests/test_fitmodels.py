@@ -37,3 +37,22 @@ def test_three_phase_recovered_and_preferred_on_synthetic_data() -> None:
     assert chi["E"] < chi["C"] and chi["E"] < chi["D"]
     assert abs(d["T_peak_ms"] - 150) < 40 and abs(d["S_peak_ms"] - 450) < 120
     assert abs(d["W_mass"] - 0.2) < 0.05
+
+
+def test_hawkes_mode_recovers_exponential_response() -> None:
+    # one exponential mode loading +0.3 on N and +0.2 on J with τ = 80 ms: K must fit it
+    x_true = np.array([0.3, 0.2, np.log(80.0), 0.0, 0.0, np.log(500.0)])
+    n, j = predict(BY_NAME["K"], x_true, EDGES)
+    sig = np.full(n.size, 0.002)
+    x, chi2 = fit(BY_NAME["K"], EDGES, n, j, sig, sig)
+    assert chi2 < 1e-3
+    d = describe(BY_NAME["K"], x)
+    big = max(("H1", "H2"), key=lambda h: abs(d[f"{h}_aN"]))
+    assert abs(d[f"{big}_tau_ms"] - 80) < 10
+
+
+def test_power_law_mass_conserved() -> None:
+    edges = np.array([0.0, 1e9])
+    x = np.array([0.4, np.log(50.0), 1.0, -0.1, np.log(50.0), 1.0])
+    n, j = predict(BY_NAME["P"], x, edges)
+    assert abs(n[0] - 0.4) < 1e-6 and abs(j[0] + 0.1) < 1e-6
