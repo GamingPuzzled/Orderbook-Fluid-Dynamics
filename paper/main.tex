@@ -140,14 +140,7 @@ October 2026 (BTCUSDT) and November 2026 (ETHUSDT). Table~\ref{tab:sample} summa
 daily 95th percentile and no other candidate run within the preceding 500\,ms. ``Clean'': at least 95\% of the
 swept levels empty at the first post-sweep book message.}
 \label{tab:sample}
-\begin{tabular}{lrrrr}
-\toprule
- & Days & Sweeps & Clean sweeps & Placebo times \\
-\midrule
-BTCUSDT & 42 & 47{,}793 & 25{,}428 & 84{,}000 \\
-ETHUSDT & 43 & 42{,}622 & 16{,}752 & 86{,}000 \\
-\bottomrule
-\end{tabular}
+\input{tables/sample.tex}
 \end{table}
 
 %----------------------------------------------------------------------------------------------
@@ -252,18 +245,7 @@ Additions exceed cancellations by more than at placebo times only from 100--250\
 \caption{Added $\div$ cancelled swept-side depth ($\kappa$) by window after the sweep. 95\%
 day-cluster bootstrap intervals in brackets. Placebo: state-matched.}
 \label{tab:kappa}
-\begin{tabular}{lcccc}
-\toprule
- & \multicolumn{2}{c}{BTCUSDT} & \multicolumn{2}{c}{ETHUSDT} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}
-Window (ms) & Sweeps & Placebo & Sweeps & Placebo \\
-\midrule
-20--40    & 0.73 [0.68, 0.80] & 1.05 & 0.61 [0.56, 0.66] & 1.01 \\
-40--100   & 0.87 [0.82, 0.91] & 1.07 & 0.85 [0.81, 0.89] & 1.00 \\
-100--250  & 0.99 [0.95, 1.02] & 1.04 & 1.12 [1.08, 1.16] & 1.03 \\
-250--1000 & 1.11 [1.09, 1.12] & 1.04 & 1.09 [1.07, 1.11] & 1.03 \\
-\bottomrule
-\end{tabular}
+\input{tables/kappa.tex}
 \end{table}
 
 \begin{figure}[ht]
@@ -283,20 +265,7 @@ Table~\ref{tab:phases} and Figure~\ref{fig:phases} report the decomposition.
 fractions of pre-sweep swept-side depth). Deep book: $d>5$. 95\% day-cluster bootstrap
 intervals in brackets.}
 \label{tab:phases}
-\begin{tabular}{lcc}
-\toprule
- & BTCUSDT & ETHUSDT \\
-\midrule
-Withdrawal, $<250$\,ms        & 0.22 [0.18, 0.25] & 0.20 [0.17, 0.25] \\
-Repositioning, $<250$\,ms     & 0.19 [0.16, 0.21] & 0.09 [0.07, 0.11] \\
-Source, $<250$\,ms            & 0.01 [0.00, 0.02] & 0.02 [0.02, 0.03] \\
-Source, $>250$\,ms            & 0.21 [0.17, 0.23] & 0.12 [0.09, 0.14] \\
-Repositioning share of near-touch build-up, $<250$\,ms & 0.93 [0.89, 0.97] & 0.81 [0.73, 0.86] \\
-Centroid: withdrawal (ms)     & 69 & 47 \\
-Centroid: repositioning (ms)  & 322 & 133 \\
-Centroid: source (ms)         & 507 & 449 \\
-\bottomrule
-\end{tabular}
+\input{tables/phases.tex}
 \end{table}
 
 \begin{figure}[ht]
@@ -411,16 +380,7 @@ chosen on training data. Table~\ref{tab:pde} reports five-fold cross-validation 
 relative to predicting no change; five-fold cross-validation by day; range across folds in
 brackets). Parameters per step: common 2; local $+3$; non-local $+1$.}
 \label{tab:pde}
-\begin{tabular}{lcc}
-\toprule
-Model & BTCUSDT & ETHUSDT \\
-\midrule
-Common (cancellation + source) & 0.653 [0.614, 0.717] & 0.389 [0.341, 0.477] \\
-+ local (diffusion + drift)    & 0.643 [0.559, 0.725] & 0.388 [0.338, 0.477] \\
-+ non-local jump               & 0.652 [0.610, 0.721] & 0.410 [0.328, 0.479] \\
-+ both                         & 0.640 [0.566, 0.728] & 0.408 [0.322, 0.481] \\
-\bottomrule
-\end{tabular}
+\input{tables/pde.tex}
 \end{table}
 
 Adding local diffusion never improves out-of-sample fit. In the full-sample fit the diffusion

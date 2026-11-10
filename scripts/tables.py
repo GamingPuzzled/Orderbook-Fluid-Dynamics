@@ -1,7 +1,8 @@
 """LaTeX tables generated from results/ (so the paper never carries hand-copied numbers).
 
 Writes paper/tables/robustness.tex (subset robustness of the three-phase refill) and
-paper/tables/execution.tex (follow-up market-order cost), both assets.
+paper/tables/execution.tex (follow-up market-order cost) and paper/tables/pde.tex
+(out-of-sample continuum model fits), plus sample.tex, kappa.tex and phases.tex; both assets.
 
 Usage: uv run python scripts/tables.py [--assets BTCUSDT,ETHUSDT] [--exchange bybit]
 """
@@ -116,6 +117,133 @@ def execution(res: Path, assets: list[str], out: Path, q_mult: float = 0.1) -> N
     (out / "execution.tex").write_text("\n".join(lines) + "\n")
 
 
+PDE_ROWS = (
+    ("common", "Common (cancellation + source)"),
+    ("local", "+ local (diffusion + drift)"),
+    ("nonlocal", "+ non-local jump"),
+    ("both", "+ both"),
+)
+
+
+def pde(res: Path, assets: list[str], out: Path) -> None:
+    """Pooled out-of-sample R² per model, with the range across folds."""
+
+    def r2(df: pl.DataFrame, keys: list[str]) -> pl.DataFrame:
+        return df.group_by(keys).agg((1 - pl.col("sse").sum() / pl.col("ss0").sum()).alias("r2"))
+
+    cells: dict[str, dict[str, str]] = {}
+    for a in assets:
+        oos = pl.read_parquet(res / a / "pde_oos.parquet")
+        tot = {m: v for m, v in r2(oos, ["model"]).iter_rows()}
+        fold = (
+            r2(oos, ["model", "fold"])
+            .group_by("model")
+            .agg(pl.col("r2").min().alias("lo"), pl.col("r2").max().alias("hi"))
+        )
+        rng = {m: (lo, hi) for m, lo, hi in fold.iter_rows()}
+        cells[a] = {m: f"{tot[m]:.3f} [{rng[m][0]:.3f}, {rng[m][1]:.3f}]" for m, _ in PDE_ROWS}
+    lines = [
+        f"\\begin{{tabular}}{{l{'c' * len(assets)}}}",
+        "\\toprule",
+        "Model & " + " & ".join(assets) + " \\\\",
+        "\\midrule",
+        *[
+            f"{label} & " + " & ".join(cells[a][m] for a in assets) + " \\\\"
+            for m, label in PDE_ROWS
+        ],
+        "\\bottomrule",
+        "\\end{tabular}",
+    ]
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "pde.tex").write_text("\n".join(lines) + "\n")
+
+
+def _rows_tex(head: str, rows: list[str], cols: str) -> str:
+    return "\n".join(
+        [f"\\begin{{tabular}}{{{cols}}}", "\\toprule", head, "\\midrule", *rows, "\\bottomrule",
+         "\\end{tabular}"]
+    ) + "\n"  # fmt: skip
+
+
+def _thou(v: int) -> str:
+    return f"{v:,}".replace(",", "{,}")
+
+
+def sample(res: Path, assets: list[str], out: Path) -> None:
+    """Days, detected sweeps, clean sweeps and placebo times (parsed from summary.md)."""
+    import re
+
+    rows = []
+    for a in assets:
+        txt = (res / a / "summary.md").read_text()
+        m = re.search(
+            r"Days used: (\d+) of \d+.*?Sweeps: (\d+) detected, (\d+) with cleared.*?"
+            r"Placebo times: (\d+)",
+            txt,
+            re.S,
+        )
+        if m is None:
+            raise ValueError(f"sample line not found in {a}/summary.md")
+        d, n, c, p = (int(x) for x in m.groups())
+        rows.append(f"{a} & {d} & {_thou(n)} & {_thou(c)} & {_thou(p)} \\\\")
+    head = " & Days & Sweeps & Clean sweeps & Placebo times \\\\"
+    (out / "sample.tex").write_text(_rows_tex(head, rows, "lrrrr"))
+
+
+KAPPA_WINDOWS = ("20-40", "40-100", "100-250", "250-1000")
+
+
+def kappa(res: Path, assets: list[str], out: Path) -> None:
+    """κ by window, sweeps (95% CI) and matched placebo."""
+    tabs = {a: pl.read_parquet(res / a / "transport_test_matched.parquet") for a in assets}
+    rows = []
+    for w in KAPPA_WINDOWS:
+        cells = []
+        for a in assets:
+            r = tabs[a].filter(pl.col("window") == w).row(0, named=True)
+            cells += [
+                f"{r['kappa']:.2f} [{r['kappa_lo']:.2f}, {r['kappa_hi']:.2f}]",
+                f"{r['kappa_placebo']:.2f}",
+            ]
+        rows.append(f"{w.replace('-', '--')} & " + " & ".join(cells) + " \\\\")
+    head = (
+        " & " + " & ".join(f"\\multicolumn{{2}}{{c}}{{{a}}}" for a in assets) + " \\\\\n"
+        + "".join(f"\\cmidrule(lr){{{2 + 2 * i}-{3 + 2 * i}}}" for i in range(len(assets)))
+        + "\nWindow (ms) & " + " & ".join("Sweeps & Placebo" for _ in assets) + " \\\\"
+    )  # fmt: skip
+    (out / "kappa.tex").write_text(_rows_tex(head, rows, "l" + "cc" * len(assets)))
+
+
+PHASE_ROWS = (  # (stat, label, digits, with CI)
+    ("withdrawal_<250ms", "Withdrawal, $<250$\\,ms", 2, True),
+    ("transport_<250ms", "Repositioning, $<250$\\,ms", 2, True),
+    ("source_<250ms", "Source, $<250$\\,ms", 2, True),
+    ("source_>250ms", "Source, $>250$\\,ms", 2, True),
+    ("transport_share_<250ms", "Repositioning share of near-touch build-up, $<250$\\,ms", 2, True),
+    ("withdrawal_centroid_ms", "Centroid: withdrawal (ms)", 0, False),
+    ("transport_centroid_ms", "Centroid: repositioning (ms)", 0, False),
+    ("source_centroid_ms", "Centroid: source (ms)", 0, False),
+)
+
+
+def phases(res: Path, assets: list[str], out: Path) -> None:
+    """Three-component decomposition, deep book d > 5."""
+    tabs = {
+        a: {s: (v, lo, hi) for s, v, lo, hi in
+            pl.read_parquet(res / a / "model_summary_deep_d_gt_5.parquet").iter_rows()}
+        for a in assets
+    }  # fmt: skip
+    rows = []
+    for stat, label, dg, ci in PHASE_ROWS:
+        cells = []
+        for a in assets:
+            v, lo, hi = tabs[a][stat]
+            cells.append(f"{v:.{dg}f} [{lo:.{dg}f}, {hi:.{dg}f}]" if ci else f"{v:.{dg}f}")
+        rows.append(f"{label} & " + " & ".join(cells) + " \\\\")
+    head = " & " + " & ".join(assets) + " \\\\"
+    (out / "phases.tex").write_text(_rows_tex(head, rows, "l" + "c" * len(assets)))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets", default="BTCUSDT,ETHUSDT")
@@ -124,7 +252,9 @@ def main() -> None:
     a = ap.parse_args()
     robustness(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
     execution(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
-    print(f"wrote {a.out}/robustness.tex, {a.out}/execution.tex")
+    for fn in (pde, sample, kappa, phases):
+        fn(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
+    print(f"wrote {a.out}/: robustness, execution, pde, sample, kappa, phases")
 
 
 if __name__ == "__main__":

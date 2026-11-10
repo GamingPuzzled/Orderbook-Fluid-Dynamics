@@ -59,25 +59,25 @@ uv run lobflow l3 --pair btcusd --n-boot 300 --until 2026-11-10T16:00
 Paper tables and figures (written to `paper/tables/`, `figures/` and `paper/figures/`):
 
 ```bash
-uv run python scripts/tables.py       # Tables: robustness, execution
+uv run python scripts/tables.py       # Tables: sample, κ, phases, execution, PDE, robustness
 uv run python scripts/figures.py      # Figures 1, 2, 3, 5
 uv run python scripts/crossasset.py   # Table: cross-asset summary; Figure 4 (all processed symbols)
 ```
 
 | Paper item | Source file | Produced by |
 |---|---|---|
-| Sample table | `results/<ex>/<sym>/summary.md` | `analyze` |
+| Sample table | `results/<ex>/<sym>/summary.md` | `analyze` → `tables.py` |
 | Recovery heatmap (Fig. 3) | `bucket_recovery.parquet` | `analyze` → `figures.py` |
-| κ table, mass-balance figure (Fig. 2) | `transport_test_matched.parquet` | `analyze` → `figures.py` |
-| Three-phase table, Fig. 1 | `model_summary_*.parquet`, `model_windows_*.parquet` | `model` → `figures.py` |
+| κ table, mass-balance figure (Fig. 2) | `transport_test_matched.parquet` | `analyze` → `tables.py`, `figures.py` |
+| Three-phase table, Fig. 1 | `model_summary_*.parquet`, `model_windows_*.parquet` | `model` → `tables.py`, `figures.py` |
 | Same-order test (L2) | `moves.md` | `moves` |
 | Bitstamp results | `results/bitstamp/btcusd/l3.md` | `l3` |
 | Execution table, Fig. 5 | `execution.parquet` | `execution` → `tables.py`, `figures.py` |
-| PDE table | `pde.md` (copied into `main.tex` by hand) | `pde` |
+| PDE table | `pde_oos.parquet` | `pde` → `tables.py` |
 | Robustness table | `robustness.parquet` | `robustness` → `tables.py` |
 | Cross-asset table / Fig. 4 | all of the above | `crossasset.py` |
 
-Bootstrap seeds are fixed, so reruns on the same days reproduce the numbers exactly.
+Every table in the paper is generated from these files (none is typed by hand). Bootstrap seeds are fixed, so reruns on the same days reproduce the numbers exactly.
 
 ## Recording the Bitstamp feed
 
