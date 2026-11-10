@@ -59,13 +59,42 @@ SCHEMA = {
 # ---------------------------------------------------------------- parsing
 
 
+GZIP_MAGIC = b"\x1f\x8b\x08"
+
+
 def _lines(path: Path) -> Iterator[str]:
-    """Lines of a (possibly still-growing or truncated) gzip file."""
-    try:
-        with gzip.open(path, "rt", encoding="utf-8") as fh:
-            yield from fh
-    except (EOFError, zlib.error, OSError):
-        return
+    """Lines of a multi-member gzip file that may contain truncated members (a writer killed
+    mid-hour, or the file still being written). A damaged member is skipped up to the next
+    gzip header, so data appended after it is still read; a partial last line is dropped."""
+    raw = path.read_bytes()
+    chunk = 1 << 16
+    pos = 0
+    while pos < len(raw):
+        d = zlib.decompressobj(zlib.MAX_WBITS | 16)
+        parts: list[bytes] = []
+        ok = False
+        end = pos
+        try:  # feed in chunks so output decoded before a corrupt byte is kept
+            while end < len(raw):
+                nxt_end = min(end + chunk, len(raw))
+                parts.append(d.decompress(raw[end:nxt_end]))
+                end = nxt_end
+                if d.eof:
+                    ok = True
+                    break
+        except zlib.error:
+            ok = False
+        lines = b"".join(parts).decode("utf-8", errors="replace").split("\n")
+        if not ok:  # truncated or corrupt member: keep complete lines only
+            lines = lines[:-1]
+        yield from (ln for ln in lines if ln)
+        if ok:
+            pos = end - len(d.unused_data)
+        else:
+            nxt = raw.find(GZIP_MAGIC, pos + 1)
+            if nxt < 0:
+                return
+            pos = nxt
 
 
 def _key(s: str, scale: int) -> int:

@@ -20,6 +20,7 @@ import gzip
 import json
 import logging
 import os
+import signal
 import time
 import urllib.request
 from pathlib import Path
@@ -74,6 +75,10 @@ def snapshot(pair: str, root: Path) -> None:
 
 
 async def record(pair: str, root: Path) -> None:
+    # SIGTERM (launchd stop, kill) cancels this task so the gzip file is closed cleanly
+    task = asyncio.current_task()
+    if task is not None:
+        asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, task.cancel)
     writer = HourlyWriter(root)
     backoff = 1.0
     channels = [f"live_orders_{pair}", f"live_trades_{pair}"]
@@ -119,7 +124,10 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     Path("logs").mkdir(exist_ok=True)
     Path(f"logs/record_bitstamp_{a.pair}.pid").write_text(str(os.getpid()))
-    asyncio.run(record(a.pair, Path(a.out) / a.pair))
+    try:
+        asyncio.run(record(a.pair, Path(a.out) / a.pair))
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        log.info("stopped")
 
 
 if __name__ == "__main__":
