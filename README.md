@@ -1,5 +1,7 @@
 # lobflow — how crypto order books refill after liquidity sweeps
 
+[![CI](https://github.com/GamingPuzzled/Orderbook-Fluid-Dynamics/actions/workflows/ci.yml/badge.svg)](https://github.com/GamingPuzzled/Orderbook-Fluid-Dynamics/actions/workflows/ci.yml)
+
 Code for the paper *Pulled, moved, then made: how crypto order books refill after liquidity
 sweeps* (Joel Pulikkan, draft in [`paper/main.tex`](paper/main.tex)).
 
