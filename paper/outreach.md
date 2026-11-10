@@ -25,7 +25,7 @@ cancellations and fills, which gives a mass balance of the swept side.
 2. **Repositioning** (~130–360 ms): depth cancelled deep in the book is re-posted near the new
    best quote. This supplies 74–93% of the early rebuild, while total depth *falls*: added ÷
    cancelled = 0.61–0.74, against ≈1.0 at matched placebo times.
-3. **New liquidity** (~450 ms): only after ~140–300 ms do additions exceed cancellations.
+3. **New liquidity** (~400–500 ms): only after ~140–300 ms do additions exceed cancellations.
 
 There is no sign of diffusion-like flow between adjacent price levels. The evidence points to
 continuum models with a non-local jump term, a shock-dependent cancellation rate and a delayed
@@ -51,7 +51,7 @@ topic of theirs], I'd be grateful for your view on it.
 
 Using 20 ms order book data for Bitcoin and Ether perpetual futures (about 42,000 events), I
 find that refill happens in three ordered phases. Market makers first pull deep orders (within
-~100 ms), then move existing depth to the new price (~100–350 ms), and only after ~450 ms does
+~100 ms), then move existing depth to the new price (~100–350 ms), and only after ~400–500 ms does
 new liquidity arrive. There is no sign of the diffusion-like flow that continuum order book
 models assume. A one-page summary and the main figure are attached.
 

@@ -32,7 +32,7 @@ reallocation in which depth cancelled deep in the book is matched by depth poste
 best quote, supplying 74--93\% of the
 near-touch rebuild in the first 250\,ms while total depth on the swept side \emph{falls}
 (additions/cancellations $=0.61$--$0.74$ at 20--40\,ms against $\approx 1.0$ in matched
-placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred near 450\,ms.
+placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred at roughly 0.4--0.5\,s.
 In out-of-sample fits of the depth profile, a local diffusion term adds no predictive power.
 The excess cost of a follow-up market order falls by about 90\% within 250\,ms, during
 repositioning, while total depth is still below normal. The results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
@@ -85,13 +85,14 @@ three ordered phases:
         book is matched by depth posted within five ticks of the new best quote. It supplies
         74--93\% of the near-touch rebuild in the first 250\,ms, while the ratio of added to
         cancelled depth on the swept side is 0.61--0.74 at 20--40\,ms, against 1.0--1.05 at
-        matched placebo times. The match is in aggregate flows: tracing individual orders by
-        exact size, we find that identical orders hopping toward the touch account for only
-        about 1\% of near-touch additions, so the reallocation is mostly carried by
-        resized or different orders.
-  \item \textbf{Source} (centroid $\approx$ 450\,ms): after roughly 140\,ms (ETH) to
+        matched placebo times. The match is in aggregate flows. In the 20\,ms level-2 feed,
+        exact-size tracing links only about 1\% of near-touch additions to deeper
+        cancellations, but this reflects netting: in a preliminary order-level sample from
+        Bitstamp, exact-amount cancel-and-repost moves supply about a quarter of near-touch
+        added volume.
+  \item \textbf{Source} (centroid $\approx$ 415--510\,ms): after roughly 140\,ms (ETH) to
         140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
-        cancellations (ratio 1.09--1.12 against 1.03): genuinely new liquidity arrives.
+        cancellations (ratio 1.09--1.12 against 1.03--1.04): genuinely new liquidity arrives.
 \end{enumerate}
 The ordering is the same for both assets and robust to the definition of the deep book, the
 matching method, sweep size, sweep side and time of day. The
@@ -111,7 +112,10 @@ extend through the book and are followed by systematic repositioning before new 
 arrives. Relative to continuum models, our evidence favours non-local and source terms over a
 local diffusion term at sub-second horizons; fractional and non-local order-book models exist in
 theory and simulation \citep{benzaquen2018fractional,diana2024anomalous}, and we provide
-empirical support for that class.
+empirical support for that class. Finally, we show that the phases matter for execution (the
+excess cost of a follow-up order is mostly gone within 250\,ms, before new liquidity arrives),
+and we use a public order-level feed from a second venue to show that cancel-and-repost moves
+are a routine part of near-touch liquidity supply.
 
 %----------------------------------------------------------------------------------------------
 \section{Data}
@@ -524,8 +528,9 @@ excess left at 250\,ms. \todo{Describe the additional coins and venues once proc
 
 \begin{table}[ht]
 \centering
-\caption{Summary by asset and venue. $\kappa_{20\text{--}40}$ and repositioning share as in
-Table~\ref{tab:robust} (NN placebo). $\bar t_{\mathrm{W}}, \bar t_{\mathrm{R}}, \bar
+\caption{Summary by asset and venue. Sweeps: clean sweeps with valid flow windows.
+$\kappa_{20\text{--}40}$ and repositioning share as in Table~\ref{tab:robust} (NN placebo,
+fine window grid, so $\kappa$ can differ from Table~\ref{tab:kappa} in the second decimal). $\bar t_{\mathrm{W}}, \bar t_{\mathrm{R}}, \bar
 t_{\mathrm{S}}$: mass-weighted centroids (ms) of withdrawal, repositioning and new liquidity.
 Switch: first window in which additions exceed cancellations (range = bootstrap interval when
 the point estimate is not unique). $\Delta R^2_{\mathrm{diff}}$: out-of-sample $R^2$ of the
