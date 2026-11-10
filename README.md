@@ -52,6 +52,7 @@ uv run lobflow moves      --exchange $EX --symbol $SYM          # exact-size mat
 uv run lobflow pde        --exchange $EX --symbol $SYM          # local vs non-local fits
 uv run lobflow execution  --exchange $EX --symbol $SYM          # follow-up order cost
 uv run lobflow fitmodels  --exchange $EX --symbol $SYM          # parametric model comparison
+uv run lobflow information --exchange $EX --symbol $SYM         # refill by post-sweep drift
 ```
 
 Bitstamp order-level replication (frozen sample used in the paper):
@@ -80,6 +81,7 @@ uv run python scripts/crossasset.py   # Table: cross-asset summary; Figure 4 (al
 | PDE table | `pde_oos.parquet` | `pde` → `tables.py` |
 | Robustness table | `robustness.parquet` | `robustness` → `tables.py` |
 | Model comparison table, Fig. 6 | `fitmodels_*.parquet` | `fitmodels` → `tables.py`, `figures.py` |
+| Informative vs uninformative sweeps table | `information_diff.parquet` | `information` → `tables.py` |
 | Cross-asset table / Fig. 4 | all of the above | `crossasset.py` |
 
 Every table in the paper is generated from these files (none is typed by hand). Bootstrap seeds are fixed, so reruns on the same days reproduce the numbers exactly.
@@ -115,7 +117,9 @@ for BTC/USD), plus a REST snapshot at each connect and every 15 minutes.
 | `moves.py` | Exact-size matching of near-touch adds to deeper cancels (L2) |
 | `pde.py` | Out-of-sample local vs non-local continuum model fits |
 | `execution.py` | Cost of a follow-up market order after sweeps |
-| `fitmodels.py` | Parametric refill models compared out of sample |
+| `fitmodels.py` | Parametric refill models (incl. Hawkes responses) compared out of sample |
+| `queuereactive.py` | Queue-reactive benchmark (flows as a function of queue sizes only) |
+| `information.py` | Refill by post-sweep price drift (adverse-selection test) |
 | `l3.py` | Bitstamp order-level replay, sweeps, flows and move tests |
 | `cli.py` | `lobflow` command-line interface |
 

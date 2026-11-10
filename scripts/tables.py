@@ -268,6 +268,37 @@ def fitmodels(res: Path, assets: list[str], out: Path) -> None:
     (out / "fitmodels.tex").write_text(_rows_tex(head, rows, "cl" + "c" * (1 + 2 * len(assets))))
 
 
+INFO_STATS = {
+    "kappa_20-40": "$\\kappa$, 20--40\\,ms",
+    "withdrawal_<250ms": "Withdrawal, $<$250\\,ms",
+    "transport_<250ms": "Repositioning, $<$250\\,ms",
+    "source_>250ms": "New liquidity, $>$250\\,ms",
+}
+INFO_POOLS = ("all placebo times", "placebo, same drift tercile")
+
+
+def information(res: Path, assets: list[str], out: Path) -> None:
+    """Continuation − reversal sweeps (5 s drift terciles), paired day-bootstrap CIs."""
+    tabs = {a: pl.read_parquet(res / a / "information_diff.parquet") for a in assets}
+    rows = []
+    for stat, label in INFO_STATS.items():
+        cells = [label]
+        for a in assets:
+            for pool in INFO_POOLS:
+                r = tabs[a].filter(pl.col("stat") == stat, pl.col("placebo_pool") == pool)
+                r0 = r.row(0, named=True)
+                txt = f"{r0['diff']:+.3f} [{r0['lo']:+.3f}, {r0['hi']:+.3f}]"
+                cells.append(txt.replace("-", "$-$").replace("+", "$+$"))
+        rows.append(" & ".join(cells) + " \\\\")
+    head = (
+        " & " + " & ".join(f"\\multicolumn{{2}}{{c}}{{{a}}}" for a in assets) + " \\\\\n"
+        + "".join(f"\\cmidrule(lr){{{2 + 2 * i}-{3 + 2 * i}}}" for i in range(len(assets)))
+        + "\nStatistic & " + " & ".join("all placebo & same-drift placebo" for _ in assets)
+        + " \\\\"
+    )  # fmt: skip
+    (out / "information.tex").write_text(_rows_tex(head, rows, "l" + "c" * (2 * len(assets))))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets", default="BTCUSDT,ETHUSDT")
@@ -276,9 +307,9 @@ def main() -> None:
     a = ap.parse_args()
     robustness(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
     execution(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
-    for fn in (pde, sample, kappa, phases, fitmodels):
+    for fn in (pde, sample, kappa, phases, fitmodels, information):
         fn(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
-    print(f"wrote {a.out}/: robustness, execution, pde, sample, kappa, phases, fitmodels")
+    print(f"wrote {a.out}/: all tables")
 
 
 if __name__ == "__main__":

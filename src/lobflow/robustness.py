@@ -14,6 +14,7 @@ Statistics per subset (95% day-cluster bootstrap CIs):
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -125,18 +126,15 @@ def kappa_day_sums(flows: pl.DataFrame, info: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def subset_stats(
+def subset_point_fn(
     s_flows: pl.DataFrame,
     s_info: pl.DataFrame,
     p_flows: pl.DataFrame,
     p_info: pl.DataFrame,
     w: pl.DataFrame,
     windows: Sequence[str],
-    *,
-    n_boot: int = 100,
-    seed: int = 0,
-) -> dict[str, float]:
-    """Point estimates and bootstrap CIs (``<stat>_lo``/``_hi``) for one subset."""
+) -> tuple[Callable[[Sequence[str]], dict[str, float]], list[str]]:
+    """(statistics for a list of days (repeats allowed), the subset's usable days)."""
     days = sorted(set(s_info["day"].unique()) & set(p_info.join(w, on="event_id")["day"]))
     s_info = s_info.filter(pl.col("day").is_in(days))
     s_sums = day_window_sums(s_flows, s_info, None, DEEP)
@@ -159,10 +157,28 @@ def subset_stats(
             out[f"kappa_{g}"] = m.get((g, "add"), 0.0) / c if c else float("nan")
         return out
 
+    return one, days
+
+
+def subset_stats(
+    s_flows: pl.DataFrame,
+    s_info: pl.DataFrame,
+    p_flows: pl.DataFrame,
+    p_info: pl.DataFrame,
+    w: pl.DataFrame,
+    windows: Sequence[str],
+    *,
+    n_boot: int = 100,
+    seed: int = 0,
+) -> dict[str, float]:
+    """Point estimates and bootstrap CIs (``<stat>_lo``/``_hi``) for one subset."""
+    one, days = subset_point_fn(s_flows, s_info, p_flows, p_info, w, windows)
     point = one(days)
     rng = np.random.default_rng(seed)
     boots = [one(rng.choice(days, size=len(days)).tolist()) for _ in range(n_boot)]
-    res: dict[str, float] = {"n_sweeps": float(s_info.filter(pl.col("valid")).height)}
+    res: dict[str, float] = {
+        "n_sweeps": float(s_info.filter(pl.col("day").is_in(days), pl.col("valid")).height)
+    }
     res["n_days"] = float(len(days))
     for st in STATS:
         b = np.array([x[st] for x in boots], dtype=float)
@@ -206,22 +222,30 @@ def _fmt(r: dict[str, object], st: str, digits: int) -> str:
     return f"{v:.{digits}f} [{lo:.{digits}f}, {hi:.{digits}f}]"
 
 
-def run_robustness(
-    out_dir: Path,
-    results_dir: Path,
-    *,
-    tag: str = "flowsfine",
-    n_boot: int = 100,
-    k: int = 5,
-    max_push_ms: float = 20.0,
-) -> str:
-    """Matching comparison (CEM vs nearest neighbour) and subset table; writes
-    ``robustness.md``, ``robustness.parquet`` and ``matching_balance.parquet``."""
+@dataclass(frozen=True)
+class SubsetInputs:
+    """Everything subset analyses need: flows, info joined with sweep covariates, and the
+    matching covariates of sweeps and placebo times."""
+
+    s_flows: pl.DataFrame
+    s_info: pl.DataFrame
+    p_flows: pl.DataFrame
+    p_info: pl.DataFrame
+    s_cov: pl.DataFrame
+    p_cov: pl.DataFrame
+    windows: list[str]
+    days: list[str]
+    events: pl.DataFrame  # sweeps (≥ 95% of gap cleared), all columns
+
+
+def prepare_subsets(
+    out_dir: Path, *, tag: str = "flowsfine", max_push_ms: float = 20.0
+) -> SubsetInputs:
     from lobflow.analysis import load_outputs
 
     data = load_outputs(out_dir, max_push_ms=max_push_ms)
     days = data["meta"].filter(pl.col("ok"))["day"].sort().to_list()
-    ev = data["events"].filter(pl.col("cleared_frac") >= 0.95)
+    events = data["events"].filter(pl.col("cleared_frac") >= 0.95)
     s_flows, s_info = load_tag(out_dir, days, tag), load_tag(out_dir, days, f"{tag}_info")
     p_flows, p_info = (
         load_tag(out_dir, days, f"{tag}_placebo"),
@@ -229,7 +253,7 @@ def run_robustness(
     )
     hour = ((pl.col("t0") // US_PER_HOUR) % 24).cast(pl.Int64).alias("hour")
     gap_rank = pl.col("L_gap").rank("average").over("day") / pl.len().over("day")
-    ev = ev.with_columns(
+    ev = events.with_columns(
         hour,
         (pl.col("volume") / pl.col("volume").median().over("day")).alias("vol_rel"),
         (gap_rank * 3).ceil().clip(1, 3).cast(pl.Int64).sub(1).alias("gap_q"),
@@ -246,6 +270,23 @@ def run_robustness(
     labels = s_flows["window"].unique().to_list()
     edges = window_edges(labels)
     windows = [f"{int(a)}-{int(b)}" for a, b in zip(edges[:-1], edges[1:], strict=True) if a > 0]
+    return SubsetInputs(s_flows, s_info, p_flows, p_info, s_cov, p_cov, windows, days, events)
+
+
+def run_robustness(
+    out_dir: Path,
+    results_dir: Path,
+    *,
+    tag: str = "flowsfine",
+    n_boot: int = 100,
+    k: int = 5,
+    max_push_ms: float = 20.0,
+) -> str:
+    """Matching comparison (CEM vs nearest neighbour) and subset table; writes
+    ``robustness.md``, ``robustness.parquet`` and ``matching_balance.parquet``."""
+    si = prepare_subsets(out_dir, tag=tag, max_push_ms=max_push_ms)
+    s_flows, s_info, p_flows, p_info = si.s_flows, si.s_info, si.p_flows, si.p_info
+    s_cov, p_cov, windows = si.s_cov, si.p_cov, si.windows
 
     rows: list[dict[str, object]] = []
     balances = []

@@ -436,6 +436,46 @@ state-matched placebo times, by delay after the sweep. Shaded: 95\% day-cluster 
 \label{fig:exec}
 \end{figure}
 
+\subsection{Do informative sweeps refill differently?}
+\label{sec:info}
+If liquidity providers pull and reposition because a sweep may be informed, the response should
+be stronger after sweeps that turn out to carry information. We measure each sweep's
+\emph{post-sweep drift}: the signed price change, in ticks, from the mid 1\,s after the sweep
+to the volume-weighted trade price 4--6\,s after it, positive when the price continues in the
+sweep's direction. Because it starts after the 1\,s window in which flows are measured, it
+excludes the sweep's own price impact. We split sweeps into within-day terciles (reversal,
+flat, continuation; median drift $-158$, $+0.5$ and $+186$ ticks for BTC) and re-match placebo
+times for each tercile, either from all placebo times or from placebo times in the same tercile
+of their own drift, which removes the generic link between price moves and order flow.
+Table~\ref{tab:info} compares continuation with reversal sweeps on the same resampled days.
+
+All three phases appear in every tercile, including sweeps that the price fully reverses:
+withdrawal before 250\,ms is 0.19--0.24 of pre-sweep depth in each tercile for both assets,
+and repositioning supplies at least 78\% of the early near-touch rebuild. Informative sweeps
+tilt the early response only modestly towards protection: additions per cancellation at
+20--40\,ms are lower by 0.04 for BTC (0.02 for ETH, not significant), withdrawal is higher by
+0.02--0.03 for BTC (about a tenth), and for ETH more depth is repositioned ($+0.03$, about a
+third). New liquidity after 250\,ms is much lower after continuation than after reversal
+relative to all placebo times ($-0.17$ BTC, $-0.04$ ETH), but not relative to placebo times
+with the same drift ($+0.02$ and $+0.03$): new liquidity follows the later price path in the
+same way as at ordinary times. The results are qualitatively the same for drift horizons of 2\,s and 10\,s.
+Drift is not exogenous: a book that stays thin can itself let the price drift, which would
+link more withdrawal to continuation, so the small differences, if anything, overstate an
+information effect. Within the first $\sim$100\,ms liquidity providers cannot yet tell
+informative from uninformative sweeps; the three phases are a generic reaction to the sweep
+itself, which information shapes only at the margin.
+
+\begin{table}[ht]
+\centering
+\caption{Continuation minus reversal sweeps (within-day terciles of post-sweep drift, 1--5\,s),
+with 95\% paired day-cluster bootstrap intervals. Placebo times re-matched per tercile from all
+placebo times, or from placebo times in the same tercile of their own drift. $\kappa$: added
+$\div$ cancelled swept-side depth (sweeps only, so identical across pools); masses are
+fractions of pre-sweep swept-side depth.}
+\label{tab:info}
+\resizebox{\textwidth}{!}{\input{tables/information.tex}}
+\end{table}
+
 %----------------------------------------------------------------------------------------------
 \section{Implications for continuum models}
 \label{sec:pde}
@@ -626,7 +666,9 @@ first $\sim$100\,ms liquidity is pulled and moved to the new price, and only aft
 is invisible in aggregate resilience measures and in best-quote studies, and it is inconsistent
 with diffusion-type continuum models at sub-second horizons. For execution, the excess cost
 of a follow-up order falls by about 90\% within 250\,ms, during repositioning, while total
-depth is still below normal. Market-making and execution models that treat refill as one
+depth is still below normal. The early phases look nearly the same whether or not the price
+later continues in the sweep's direction, so they are a reaction to the sweep itself rather
+than to its information content. Market-making and execution models that treat refill as one
 exponential recovery of depth miss this ordering: the price for small orders recovers by
 moving existing liquidity, and depth for large orders recovers only once new liquidity
 arrives.
