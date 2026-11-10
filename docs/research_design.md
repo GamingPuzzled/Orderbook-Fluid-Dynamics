@@ -319,3 +319,24 @@ Fig 1 plots rates, so the late source looks small though its integrated mass (0.
 pre depth) is comparable to early transport — state this in the caption.
 Withdrawal phase = multi-level "quote fade" (Malinova & Park 2016); cite as precursor
 (literature_review §12). Contribution = decomposition + sequencing, not the existence of fades.
+
+### 15.7 Matching refinement and subset robustness (2026-11-10)
+
+`lobflow robustness` (src/lobflow/robustness.py) → `results/<ex>/<sym>/robustness.{md,parquet}`,
+`matching_balance.parquet`; LaTeX table via `scripts/tables.py` → `paper/tables/robustness.tex`.
+
+- **Matching.** Quartile CEM leaves a depth gap because sweeps sit in the open-ended top
+  quartile (BTC depth std diff +0.32). Within-day 5-nearest-neighbour matching on standardised
+  log covariates (`state.nn_weights`) cuts every |std diff| to ≤ 0.12 (depth +0.07 BTC, +0.04
+  ETH). κ, withdrawal, repositioning and repositioning share unchanged (e.g. BTC repositioning
+  <250 ms 0.19 CEM vs 0.17 NN; share 0.94 vs 0.93).
+- **Subsets** (NN, re-matched per subset; side/time-of-day subsets draw placebo from same
+  side/hours): levels-cleared terciles within day, volume above/below day median, buy/sell,
+  UTC 00–08/08–16/16–24. All subsets, both assets: κ(20–40) 0.53–0.81 with CIs < 1,
+  κ(250–1000) 1.07–1.15, repositioning share <250 ms ≥ 0.74.
+- **Size gradient.** Larger sweeps → more withdrawal and repositioning (BTC repositioning
+  0.08 smallest third vs 0.29 largest); smallest sweeps show strongest early net depletion
+  (κ 0.56 BTC, 0.53 ETH). No side or time-of-day effect.
+- Fixed level bins are uninformative: median sweep clears 70 (BTC) / 44 (ETH) ticks.
+- Cron script now chains fine-grid flows → model → robustness per symbol (`--max-push-ms`
+  passed through: 20 Bybit, 30 Binance).

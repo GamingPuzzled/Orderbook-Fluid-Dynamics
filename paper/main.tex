@@ -88,7 +88,8 @@ three ordered phases:
         140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
         cancellations (ratio 1.09--1.12 against 1.03): genuinely new liquidity arrives.
 \end{enumerate}
-The ordering is the same for both assets and robust to the definition of the deep book. The
+The ordering is the same for both assets and robust to the definition of the deep book, the
+matching method, sweep size, sweep side and time of day. The
 best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
 
@@ -185,8 +186,13 @@ with a random side. Sweeps occur in busier, more volatile markets and on thinner
 reweight placebo events within each day by coarsened exact matching on quartiles (of that day's
 sweeps) of 10\,s traded volume, 60\,s realised variation and pre-event swept-side depth. All
 sweeps lie in strata with placebo support. Matching moves placebo means most of the way to the
-sweep means (e.g.\ BTC 10\,s volume: sweeps 28.9, raw placebo 9.0, matched 24.9).
-\todo{finer matching to close the residual depth gap (19.2 vs 26.7).}
+sweep means (e.g.\ BTC 10\,s volume: sweeps 28.9, raw placebo 9.0, matched 24.9). Because
+sweeps concentrate in the open-ended top quartile, quartile strata leave a residual gap in
+pre-event depth (BTC: sweeps 19.2, matched placebo 26.7; standardised difference $+0.32$). As a
+check we also match each sweep to its five nearest placebo times within the day, in
+standardised log covariates. This reduces every standardised difference to at most 0.12 in
+absolute value (depth: $+0.07$ BTC, $+0.04$ ETH) and leaves all results unchanged
+(Section~\ref{sec:robust}).
 
 \subsection{Three-component decomposition}
 On a fine window grid (20\,ms steps to 100\,ms, then 140, 200, 300, 450, 650, 1000\,ms) we
@@ -310,17 +316,82 @@ check of continuum validity \citep{yura2015knudsen}.}
 
 %----------------------------------------------------------------------------------------------
 \section{Related literature}
-\todo{expand from docs/literature\_review.md: resilience
-\citep{large2007resiliency,degryse2005aggressive,xu2017resiliency,clapham2021speed,lo2015resiliency};
-continuum and SPDE models
-\citep{donier2015minimal,mastromatteo2014anomalous,cont2021spde,hambly2024porous,benzaquen2018fractional,diana2024anomalous};
-point processes \citep{bacry2015hawkes,lu2018highdim,rambaldi2017volume,huang2015queue};
-cancellations and quote fade \citep{MalinovaPark2016,hasbrouck2009fleeting}; placement inside the
-spread after liquidity crises \citep{ponzi2006crises}; crypto perpetual microstructure
-\citep{albers2025dilemma}.}
+
+\paragraph{Resilience.} Empirical work on order book resilience measures how fast spreads and
+depth recover after aggressive orders. \citet{large2007resiliency} estimates a
+multivariate point process on London Stock Exchange data and finds that the book often fails to
+replenish, with a half-life of around 20 seconds when it does. \citet{degryse2005aggressive}
+study the aftermath of aggressive orders on Euronext; \citet{xu2017resiliency} find that spread
+and depth at the best quotes recover within about 20 best-limit updates; and
+\citet{clapham2021speed} show that high-frequency traders restore the spread within seconds,
+whereas depth is rebuilt more slowly and mostly by other participants.
+\citet{lo2015resiliency} estimate impulse responses of depth at several levels and find weaker
+recovery away from the best quotes. These studies characterise \emph{how fast} liquidity
+returns, at the best quotes or in aggregate. We ask \emph{where it comes from}: whether
+near-touch depth is new or moved from deeper in the book. In optimal execution, resilience
+enters as an exponential \citep{obizhaeva2013optimal} or more general \citep{alfonsi2010optimal}
+relaxation of a single deficit; our results suggest that this deficit has internal structure
+on sub-second horizons.
+
+\paragraph{Continuum and SPDE models.} The latent order book of \citet{donier2015minimal} and
+\citet{mastromatteo2014anomalous} treats buy and sell intentions as densities that diffuse,
+react and are injected, which yields square-root impact. \citet{benzaquen2018fractional}
+replace ordinary diffusion with a fractional, non-local operator, and \citet{diana2024anomalous}
+simulate fractional-diffusion order books. \citet{cont2021spde} model the observed book density
+as a stochastic PDE around the mid price and calibrate it to the average profile, and
+\citet{hambly2024porous} study a stochastic porous-medium equation motivated by the order book.
+To our knowledge these models have not been confronted with the conditional, post-shock
+dynamics of the depth profile. Our evidence supports their non-local variants over local
+diffusion at the horizons we study.
+
+\paragraph{Order flow as point processes.} Hawkes and queue-reactive models describe order
+arrivals and cancellations as self- and cross-exciting
+\citep{bacry2015hawkes,rambaldi2017volume,lu2018highdim} or as functions of queue sizes
+\citep{huang2015queue}. They usually model event timing at the best limits or a few levels.
+Our decomposition is complementary: it measures where in the depth profile cancellations and
+additions occur after a shock, which constrains how such models should couple levels.
+
+\paragraph{Cancellations, quote fade and placement.} \citet{hasbrouck2009fleeting} document
+that a large share of limit orders are cancelled within seconds. \citet{MalinovaPark2016} show
+with trader-level data that high-frequency market makers cancel quotes within milliseconds of
+a trade (``quote fade''). Our withdrawal phase is a multi-level analogue of this behaviour.
+\citet{ponzi2006crises} find that after temporary liquidity crises new orders are placed inside
+the spread, the closest equity precedent for our repositioning phase; our contribution is to
+separate repositioning from new liquidity through a mass balance and to order the phases in
+time.
+
+\paragraph{Crypto perpetual futures.} \citet{albers2025dilemma} study market making on a
+crypto perpetual futures venue and its fee and queue-position constraints. Crypto venues
+publish full-depth incremental feeds with aggressor flags, which make the decomposition here
+feasible without order identifiers.
 
 %----------------------------------------------------------------------------------------------
 \section{Robustness and limitations}
+\label{sec:robust}
+
+Table~\ref{tab:robust} repeats the analysis on subsets of sweeps. For each subset, placebo
+times are re-matched within the day by nearest neighbours; for the side and time-of-day subsets,
+placebo times are drawn only from the same side or hours. In every subset and for both assets,
+additions fall short of cancellations at 20--40\,ms ($\kappa$ between 0.53 and 0.81, all
+intervals below 1), withdrawal and repositioning are positive in the first 250\,ms, and
+repositioning supplies at least 74\% of the near-touch rebuild. Results do not depend on the
+side of the sweep or the time of day. Sweep size matters: sweeps that clear more levels
+trigger more withdrawal and more repositioning (BTC repositioning 0.08 in the smallest third
+versus 0.29 in the largest), while the smallest sweeps show the strongest early net depletion
+($\kappa = 0.56$ BTC, $0.53$ ETH).
+
+\begin{table}[ht]
+\centering
+\caption{Robustness by subset. $\kappa_{20\text{--}40}$: added $\div$ cancelled swept-side depth
+at 20--40\,ms (sweeps). Withdrawal and repositioning: excess masses before 250\,ms as fractions
+of pre-sweep swept-side depth. Repositioning share: repositioning $\div$ near-touch build-up
+before 250\,ms. CEM: quartile strata; NN: five nearest placebo times per sweep. Subsets use NN
+matching, re-matched per subset; levels-cleared and volume splits are within day. Fine window
+grid; 95\% day-cluster bootstrap intervals (100 replications) in brackets.}
+\label{tab:robust}
+\resizebox{\textwidth}{!}{\input{tables/robustness.tex}}
+\end{table}
+
 \begin{itemize}
   \item \textbf{Level-2 data.} Without order identifiers we cannot show that the \emph{same}
         orders move; repositioning is identified from matched aggregate cancellation and
@@ -332,7 +403,6 @@ spread after liquidity crises \citep{ponzi2006crises}; crypto perpetual microstr
         size so it cannot absorb later cancellations.
   \item \textbf{Venue and assets.} One venue, two assets. \todo{SOLUSDT, XRPUSDT, LINKUSDT
         (Bybit) and Binance BTCUSDT futures.}
-  \item \todo{robustness by sweep size, side, time of day; finer state matching.}
 \end{itemize}
 
 %----------------------------------------------------------------------------------------------

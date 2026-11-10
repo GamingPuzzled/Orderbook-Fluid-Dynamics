@@ -2,7 +2,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from lobflow.state import matching_weights, state_covariates
+from lobflow.state import matching_weights, nn_weights, state_covariates
 
 
 def test_state_covariates_windows() -> None:
@@ -27,3 +27,14 @@ def test_matching_weights_reproduce_sweep_mix() -> None:
     assert lo / (lo + hi) == pytest.approx(0.5)
     assert w["w"].mean() == pytest.approx(1.0)
     assert w["sweep_coverage"][0] == pytest.approx(1.0)
+
+
+def test_nn_weights_track_upper_tail() -> None:
+    # sweeps all high; placebo mostly low with a few high rows -> weight lands on high rows
+    sweep = pl.DataFrame({"x": [10.0, 11.0, 12.0, 13.0]})
+    placebo = pl.DataFrame({"x": [0.0] * 20 + [10.5, 12.5]})
+    w = nn_weights(sweep, placebo, columns=("x",), k=1)
+    assert w.filter(pl.col("x") == 0.0)["w"].sum() == 0.0
+    matched = (w["x"] * w["w"]).sum() / w["w"].sum()
+    assert matched == pytest.approx(11.5)
+    assert w.filter(pl.col("w") > 0)["w"].mean() == pytest.approx(1.0)

@@ -85,15 +85,25 @@ def load_outputs(
 
 
 def placebo_weights(
-    state: pl.DataFrame, sweep_info: pl.DataFrame, placebo_info: pl.DataFrame
+    state: pl.DataFrame,
+    sweep_info: pl.DataFrame,
+    placebo_info: pl.DataFrame,
+    *,
+    method: str = "cem",
+    k: int = 5,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """State-matching weights for placebo events, matched within each day.
 
-    Strata: quartiles (of that day's sweeps) of 10 s volume, 60 s realised variation and
-    pre-shock swept-side depth. Returns (weights: event_id, w), and a balance table of mean
-    covariates for sweeps, raw placebo and weighted placebo.
+    Covariates: 10 s volume, 60 s realised variation, pre-shock swept-side depth.
+    ``method="cem"``: strata = quartiles of that day's sweeps. ``method="nn"``: k nearest
+    placebo times per sweep in standardised log covariates (tighter in the upper tail).
+    Returns (weights: event_id, w), and a balance table of mean covariates for sweeps, raw
+    placebo and weighted placebo.
     """
-    from lobflow.state import matching_weights
+    from lobflow.state import matching_weights, nn_weights
+
+    if method not in ("cem", "nn"):
+        raise ValueError(f"unknown matching method {method!r}")
 
     cols = ("vol_10s", "rv_60s", "depth_pre_swept")
     s_all = state.filter(pl.col("set") == "sweep").join(
@@ -108,8 +118,11 @@ def placebo_weights(
         sd, pd_ = s_all.filter(pl.col("day") == day), p_all.filter(pl.col("day") == day)
         if sd.height < 8 or pd_.height == 0:
             continue
-        parts.append(matching_weights(sd, pd_, columns=cols))
-    w = pl.concat(parts)
+        if method == "nn":
+            parts.append(nn_weights(sd, pd_, columns=cols, k=k))
+        else:
+            parts.append(matching_weights(sd, pd_, columns=cols))
+    w = pl.concat(parts, how="diagonal_relaxed")
     bal_cols = [*cols, "n_10s"]
     s_mean = s_all.select([pl.col(c).cast(pl.Float64).mean() for c in bal_cols]).row(0)
     p_mean = p_all.select([pl.col(c).cast(pl.Float64).mean() for c in bal_cols]).row(0)

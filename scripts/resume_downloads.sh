@@ -2,8 +2,19 @@
 # Resume rate-limited Tardis downloads in phases (run from cron; idempotent: finished days skip).
 #   resume_downloads.sh bybit    -> SOL, XRP, LINK (Bybit), then analyze each
 #   resume_downloads.sh binance  -> Binance futures BTCUSDT, 12 quarterly days, then analyze
+# After each symbol: fine-grid flows, three-component model, robustness table.
 # Removes its own crontab line after running so each phase fires once.
 set -u
+EDGES=0,20,40,60,80,100,140,200,300,450,650,1000
+
+post() {  # post <exchange> <symbol> <max push ms>: fine flows -> model -> robustness
+  local P="--max-push-ms $3"
+  $UV run lobflow flows --exchange "$1" --symbol "$2" --tag flowsfine --edges $EDGES \
+    --workers 1 ${=P} >> "$LOG" 2>&1
+  $UV run lobflow model --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
+  $UV run lobflow robustness --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
+  echo "$2 post exit $?" >> "$LOG"
+}
 PHASE="$1"
 ROOT="/Users/joelpulikkan/Orderbook Fluid Dynamics"
 UV=/opt/homebrew/bin/uv
@@ -18,6 +29,7 @@ case "$PHASE" in
         --prune-raw --workers 2 >> "$LOG" 2>&1
       $UV run lobflow analyze --exchange bybit --symbol $SYM > /dev/null 2>> "$LOG"
       echo "$SYM exit $?" >> "$LOG"
+      post bybit $SYM 20
     done
     ;;
   binance)
@@ -27,6 +39,7 @@ case "$PHASE" in
     $UV run lobflow analyze --exchange binance-futures --symbol BTCUSDT --max-push-ms 30 \
       > /dev/null 2>> "$LOG"
     echo "binance exit $?" >> "$LOG"
+    post binance-futures BTCUSDT 30
     ;;
   *)
     echo "unknown phase $PHASE" >> "$LOG"; exit 2

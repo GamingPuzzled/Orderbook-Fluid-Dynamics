@@ -156,7 +156,8 @@ def _flows_day(
 
 
 def _cmd_flows(a: argparse.Namespace) -> int:
-    """Gross-flow outputs for every processed main-sample day (push ≤ 20 ms, ≥ 50 levels)."""
+    """Gross-flow outputs for every processed main-sample day (push ≤ --max-push-ms, ≥ 50
+    levels)."""
     import json
 
     out = Path(a.events) / a.exchange / a.symbol
@@ -165,7 +166,7 @@ def _cmd_flows(a: argparse.Namespace) -> int:
     for f in sorted(out.glob("*_meta.json")):
         m = json.loads(f.read_text())
         fd = m["feed"]
-        main = fd["push_interval_ms_p50"] <= 20 and (
+        main = fd["push_interval_ms_p50"] <= a.max_push_ms and (
             min(fd["snapshot_levels_bid"], fd["snapshot_levels_ask"]) >= 50
         )
         day = m["day"]
@@ -185,7 +186,17 @@ def _cmd_model(a: argparse.Namespace) -> int:
     from lobflow.model import run_model
 
     out = Path(a.events) / a.exchange / a.symbol
-    print(run_model(out, Path(a.results) / a.exchange / a.symbol, tag=a.tag, n_boot=a.n_boot))
+    res = Path(a.results) / a.exchange / a.symbol
+    print(run_model(out, res, tag=a.tag, n_boot=a.n_boot, max_push_ms=a.max_push_ms))
+    return 0
+
+
+def _cmd_robustness(a: argparse.Namespace) -> int:
+    from lobflow.robustness import run_robustness
+
+    out = Path(a.events) / a.exchange / a.symbol
+    res = Path(a.results) / a.exchange / a.symbol
+    print(run_robustness(out, res, tag=a.tag, n_boot=a.n_boot, k=a.k, max_push_ms=a.max_push_ms))
     return 0
 
 
@@ -259,6 +270,7 @@ def build_parser() -> argparse.ArgumentParser:
     fl.add_argument(
         "--state-only", action="store_true", help="only write pre-event state covariates"
     )
+    fl.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     fl.set_defaults(fn=_cmd_flows)
 
     mo = sub.add_parser("model", help="fit the two-phase (transport + source) refill model")
@@ -268,7 +280,19 @@ def build_parser() -> argparse.ArgumentParser:
     mo.add_argument("--results", default="results")
     mo.add_argument("--tag", default="flowsfine")
     mo.add_argument("--n-boot", type=int, default=200)
+    mo.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     mo.set_defaults(fn=_cmd_model)
+
+    ro = sub.add_parser("robustness", help="matching comparison and subset robustness table")
+    ro.add_argument("--exchange", required=True)
+    ro.add_argument("--symbol", required=True)
+    ro.add_argument("--events", default="data/events")
+    ro.add_argument("--results", default="results")
+    ro.add_argument("--tag", default="flowsfine")
+    ro.add_argument("--n-boot", type=int, default=100)
+    ro.add_argument("--k", type=int, default=5, help="nearest placebo times per sweep")
+    ro.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
+    ro.set_defaults(fn=_cmd_robustness)
     return ap
 
 

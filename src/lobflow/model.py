@@ -283,12 +283,17 @@ def fit_two_phase(
 
 
 def run_model(
-    out_dir: Path, results_dir: Path, *, tag: str = "flowsfine", n_boot: int = 200
+    out_dir: Path,
+    results_dir: Path,
+    *,
+    tag: str = "flowsfine",
+    n_boot: int = 200,
+    max_push_ms: float = 20.0,
 ) -> str:
     """Fit the two-phase model for one symbol; write ``model.md`` and parquet tables."""
     from lobflow.analysis import load_outputs, placebo_weights
 
-    data = load_outputs(out_dir)
+    data = load_outputs(out_dir, max_push_ms=max_push_ms)
     days_ok = data["meta"].filter(pl.col("ok"))["day"].sort().to_list()
 
     def load(kind: str) -> pl.DataFrame:

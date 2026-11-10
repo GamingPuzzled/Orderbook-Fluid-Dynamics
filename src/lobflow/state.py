@@ -82,3 +82,34 @@ def matching_weights(
     mean_w = out.filter(pl.col("w") > 0)["w"].mean()
     scale = 1.0 / float(mean_w) if isinstance(mean_w, (int, float)) and mean_w > 0 else 1.0
     return out.with_columns(pl.col("w") * scale, pl.lit(coverage).alias("sweep_coverage"))
+
+
+def nn_weights(
+    sweep_cov: pl.DataFrame,
+    placebo_cov: pl.DataFrame,
+    *,
+    columns: Sequence[str] = ("vol_10s", "rv_60s", "depth_pre_swept"),
+    k: int = 5,
+) -> pl.DataFrame:
+    """Nearest-neighbour matching weights for placebo rows (with replacement).
+
+    Covariates are log1p-transformed and standardised by the sweep standard deviation; each
+    sweep spreads weight 1/k over its k nearest placebo rows (Euclidean). Unlike quantile
+    strata, this keeps tracking sweeps in the open-ended upper tail. Returns ``placebo_cov``
+    with ``w`` (mean 1 over rows with w > 0) and ``sweep_coverage`` = 1.0 (every sweep is
+    matched; use the balance table to judge match quality).
+    """
+    from scipy.spatial import cKDTree
+
+    def design(df: pl.DataFrame) -> F64:
+        return np.column_stack([np.log1p(df[c].to_numpy().astype(np.float64)) for c in columns])
+
+    xs, xp = design(sweep_cov), design(placebo_cov)
+    scale = xs.std(axis=0)
+    scale[~(scale > 0)] = 1.0
+    kk = min(k, xp.shape[0])
+    _, idx = cKDTree(xp / scale).query(xs / scale, k=kk)
+    counts = np.bincount(np.asarray(idx).reshape(-1), minlength=xp.shape[0]) / kk
+    pos = counts > 0
+    w = counts / counts[pos].mean() if pos.any() else counts
+    return placebo_cov.with_columns(pl.Series("w", w), pl.lit(1.0).alias("sweep_coverage"))
