@@ -34,8 +34,8 @@ near-touch rebuild in the first 250\,ms while total depth on the swept side \emp
 (additions/cancellations $=0.61$--$0.74$ at 20--40\,ms against $\approx 1.0$ in matched
 placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred near 450\,ms.
 In out-of-sample fits of the depth profile, a local diffusion term adds no predictive power.
-The
-results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
+The excess cost of a follow-up market order falls by about 90\% within 250\,ms, during
+repositioning, while total depth is still below normal. The results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
 a state-dependent cancellation rate and a delayed source replace the diffusion term.
 \end{abstract}
 
@@ -338,6 +338,33 @@ event. With only 87 sweeps, this sample cannot yet say whether moves intensify a
 the post-sweep dip in additions relative to cancellations does replicate in direction
 ($\kappa_{20\text{--}40}=0.77$, CI 0.56--1.05). \todo{Update with the full Bitstamp sample.}
 
+\subsection{What a follow-up order pays}
+\label{sec:exec}
+The phases matter for anyone who trades right after a sweep. For a market order of size $Q$ on
+the swept side at delay $\tau$, we walk the stored swept-side profile and compute its cost as
+the fill-weighted distance from the mid at $\tau$, in basis points; volume beyond 50 ticks is
+charged at 51 ticks, so costs are lower bounds. We set $Q$ to a tenth of the median placebo depth
+within 50 ticks (0.83\,BTC; 21.6\,ETH) and compare with state-matched placebo times
+(Table~\ref{tab:exec}). Just before the sweep, costs match placebo. Twenty milliseconds after
+it, the follow-up order pays three times the placebo cost for BTC and twice for ETH, even
+though a quarter to a third of the order still falls beyond 50 ticks and is undercharged. The excess then
+decays fast: 62\% (BTC) and 78\% (ETH) of it is gone by 60\,ms and 87\% and 95\% by
+250\,ms, during the repositioning phase and well before new liquidity arrives. Orders of a
+quarter of median depth recover more slowly: a fifth of their excess remains at 250\,ms. The
+book thus restores its \emph{price} for small orders by moving existing depth, while total
+depth is still below normal, so a trader splitting a large order gains most by waiting
+100--250\,ms, and gains little from waiting longer.
+
+\begin{table}[t]
+\centering
+\caption{Cost of a follow-up market order on the swept side ($Q$ = 0.1 $\times$ median placebo
+depth within 50 ticks), in bps from the mid at $\tau$. Excess = sweep $-$ NN-matched placebo,
+95\% day-cluster bootstrap intervals in brackets; Left = excess relative to its 20\,ms
+value.}
+\label{tab:exec}
+\resizebox{\textwidth}{!}{\input{tables/execution.tex}}
+\end{table}
+
 %----------------------------------------------------------------------------------------------
 \section{Implications for continuum models}
 
@@ -501,8 +528,12 @@ grid; 95\% day-cluster bootstrap intervals (100 replications) in brackets.}
 After a multi-level sweep, the crypto perpetual order book refills in three ordered phases:
 liquidity is first pulled, then moved to the new price, and only then made anew. The sequencing
 is invisible in aggregate resilience measures and in best-quote studies, and it is inconsistent
-with diffusion-type continuum models at sub-second horizons. \todo{implications for execution
-and market-making models.}
+with diffusion-type continuum models at sub-second horizons. For execution, the excess cost
+of a follow-up order falls by about 90\% within 250\,ms, during repositioning, while total
+depth is still below normal. Market-making and execution models that treat refill as one
+exponential recovery of depth miss this ordering: the price for small orders recovers by
+moving existing liquidity, and depth for large orders recovers only once new liquidity
+arrives.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

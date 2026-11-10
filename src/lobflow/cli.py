@@ -232,6 +232,15 @@ def _cmd_pde(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_execution(a: argparse.Namespace) -> int:
+    from lobflow.execution import run_execution
+
+    out = Path(a.events) / a.exchange / a.symbol
+    res = Path(a.results) / a.exchange / a.symbol
+    print(run_execution(out, res, max_push_ms=a.max_push_ms, n_boot=a.n_boot))
+    return 0
+
+
 def _cmd_l3(a: argparse.Namespace) -> int:
     from lobflow.l3 import run_l3
 
@@ -368,6 +377,15 @@ def build_parser() -> argparse.ArgumentParser:
     pd_.add_argument("--folds", type=int, default=5)
     pd_.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     pd_.set_defaults(fn=_cmd_pde)
+
+    ex = sub.add_parser("execution", help="cost of a follow-up market order after sweeps")
+    ex.add_argument("--exchange", required=True)
+    ex.add_argument("--symbol", required=True)
+    ex.add_argument("--events", default="data/events")
+    ex.add_argument("--results", default="results")
+    ex.add_argument("--n-boot", type=int, default=200)
+    ex.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
+    ex.set_defaults(fn=_cmd_execution)
 
     l3p = sub.add_parser("l3", help="Bitstamp order-level (L3) replication and move test")
     l3p.add_argument("--pair", default="btcusd")

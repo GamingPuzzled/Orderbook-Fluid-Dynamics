@@ -3,7 +3,8 @@
 #   resume_downloads.sh bybit    -> SOL, XRP, LINK (Bybit), then analyze each
 #   resume_downloads.sh binance  -> Binance futures BTCUSDT, 12 quarterly days, then analyze
 #   resume_downloads.sh okx      -> OKX BTC-USDT-SWAP (tick-by-tick book), 12 quarterly days
-# After each symbol: fine-grid flows, three-component model, robustness, size matching, PDE fit.
+# After each symbol: fine-grid flows, three-component model, robustness, size matching, PDE fit,
+# follow-up execution cost.
 # Removes its own crontab line after running so each phase fires once.
 set -u
 EDGES=0,20,40,60,80,100,140,200,300,450,650,1000
@@ -16,6 +17,7 @@ post() {  # post <exchange> <symbol> <max push ms>: fine flows -> model -> robus
   $UV run lobflow robustness --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
   $UV run lobflow moves --exchange "$1" --symbol "$2" --workers 2 ${=P} > /dev/null 2>> "$LOG"
   $UV run lobflow pde --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
+  $UV run lobflow execution --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
   echo "$2 post exit $?" >> "$LOG"
 }
 PHASE="$1"
