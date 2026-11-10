@@ -27,12 +27,14 @@ and ETHUSDT, 85 days, 42{,}180 isolated multi-level sweeps) and a placebo matche
 volatility and depth. Measuring depth relative to the moving opposite quote and decomposing
 every book update into additions, cancellations and fills, we find that refill proceeds in
 three ordered phases: (i) \emph{withdrawal}, a multi-level quote fade in which deep orders are
-cancelled within about 50--110\,ms; (ii) \emph{repositioning}, in which existing depth is
-cancelled deep in the book and re-posted near the new best quote, supplying 74--93\% of the
+cancelled within about 50--110\,ms; (ii) \emph{repositioning}, a depth-conserving
+reallocation in which depth cancelled deep in the book is matched by depth posted near the new
+best quote, supplying 74--93\% of the
 near-touch rebuild in the first 250\,ms while total depth on the swept side \emph{falls}
 (additions/cancellations $=0.61$--$0.74$ at 20--40\,ms against $\approx 1.0$ in matched
 placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred near 450\,ms.
-We find no evidence of local, diffusion-like transport between adjacent price levels. The
+In out-of-sample fits of the depth profile, a local diffusion term adds no predictive power.
+The
 results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
 a state-dependent cancellation rate and a delayed source replace the diffusion term.
 \end{abstract}
@@ -83,7 +85,10 @@ three ordered phases:
         book is matched by depth posted within five ticks of the new best quote. It supplies
         74--93\% of the near-touch rebuild in the first 250\,ms, while the ratio of added to
         cancelled depth on the swept side is 0.61--0.74 at 20--40\,ms, against 1.0--1.05 at
-        matched placebo times.
+        matched placebo times. The match is in aggregate flows: tracing individual orders by
+        exact size, we find that identical orders hopping toward the touch account for only
+        about 1\% of near-touch additions, so the reallocation is mostly carried by
+        resized or different orders.
   \item \textbf{Source} (centroid $\approx$ 450\,ms): after roughly 140\,ms (ETH) to
         140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
         cancellations (ratio 1.09--1.12 against 1.03): genuinely new liquidity arrives.
@@ -93,7 +98,11 @@ matching method, sweep size, sweep side and time of day. The
 best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
 
-\paragraph{Contribution.} Relative to resilience studies at the best quotes
+\paragraph{Contribution.} \citet{bonart2017latency} show that net order flow at the best
+quotes passes through distinct phases after a market order: a fast net outflow at the
+same-side best quote followed by ``stimulated refill''. Our first and third phases are the
+multi-level counterparts of these. Relative to their work and to resilience studies at the
+best quotes
 \citep{large2007resiliency,xu2017resiliency,clapham2021speed} and aggregate impulse responses
 \citep{lo2015resiliency}, we provide a depth-profile mass balance that separates withdrawal,
 depth-conserving repositioning and net new liquidity, and we time each phase at 20\,ms
@@ -210,6 +219,7 @@ The 0--20\,ms window, which contains the sweep's own fills, is excluded.
 
 %----------------------------------------------------------------------------------------------
 \section{Results}
+\label{sec:results}
 
 \subsection{The book relocates, then the touch rebuilds}
 Figure~\ref{fig:heat} shows $R(d,\tau)$. At 20\,ms the best quote ($d=1$) holds 19\% (BTC) and
@@ -299,6 +309,22 @@ it is cancellation of orders stranded more than 50 ticks from the new price) but
 ordering and the dominance of repositioning before 250\,ms intact (share 0.74 [0.66, 0.83] BTC;
 0.78 [0.73, 0.84] ETH).
 
+\subsection{Do the same orders move?}
+Level-2 data carry no order identifiers, but crypto order sizes are fine-grained
+(e.g.\ 0.137\,BTC). If market makers move orders, a near-touch addition should often have
+exactly the size of a cancellation at a strictly deeper price within a short lag. For each
+near-touch addition of a rare size (we drop each day's most common sizes, which together make
+up half of all updates), we look for a deeper cancellation of identical size within 100\,ms in
+either order, and, as a coincidence benchmark, for one whose size differs by exactly one lot.
+Exact matches are about four times as frequent as one-lot matches (BTC 1.4\% vs 0.3\% of
+near-touch addition volume; ETH 1.4\% vs 0.4\%), so linked cancel-and-repost pairs exist.
+But they cover only about 1\% of near-touch additions and are no more frequent after sweeps than
+at matched placebo times. The test has limited power: each 20\,ms message nets all changes at a
+price, which hides moves at busy levels, and post-sweep levels are the busiest. We therefore
+interpret repositioning as a depth-conserving reallocation in aggregate flows, carried mostly by
+resized or different orders rather than identical orders hopping toward the touch.
+Order-level data with identifiers are needed to settle the point (Section~\ref{sec:robust}).
+
 %----------------------------------------------------------------------------------------------
 \section{Implications for continuum models}
 
@@ -310,9 +336,46 @@ refills a cleared region from its edges. Our evidence instead supports
 \end{equation}
 with a non-local kernel $K$ active within the first few hundred milliseconds (repositioning), a
 state-dependent cancellation rate $\nu$ that spikes immediately after the shock (withdrawal),
-and a delayed source $S$ centred near half a second. We do not detect a local diffusion
-component at these horizons. \todo{estimate $K$, $\nu(t)$, $S(t)$ parametrically; Knudsen-number
-check of continuum validity \citep{yura2015knudsen}.}
+and a delayed source $S$ centred near half a second.
+
+To test this against the local alternative, we fit discrete versions of both equations to the
+pooled swept-side profile $\rho_k(d)$, $d=1,\dots,50$, at $\tau_k \in
+\{20,40,60,100,250,500,1000\}$\,ms, predicting each one-step change
+$\rho_{k+1}-\rho_k$ from $\rho_k$. All models share a cancellation term $-\nu_k\rho$ and a
+near-touch source $s_k\phi_\ell(d)$ with $\phi_\ell \propto e^{-(d-1)/\ell}$. The local model
+adds diffusion $D_k\,\Delta^2\rho$ and a drift $a_k\nabla\rho$ (which also absorbs the
+mechanical shift of the moving frame); the non-local model adds a mass-conserving jump
+$\kappa_k[\phi_\lambda(d)\sum_{y\geq m}\rho(y) - \mathbf{1}\{d\geq m\}\rho(d)]$ from the deep
+book to the touch. Rates are step-specific and non-negative; shapes $(\ell,\lambda,m)$ are
+chosen on training data. Table~\ref{tab:pde} reports five-fold cross-validation by day.
+
+\begin{table}[ht]
+\centering
+\caption{Out-of-sample fit of the one-step change in the swept-side depth profile ($R^2$
+relative to predicting no change; five-fold cross-validation by day; range across folds in
+brackets). Parameters per step: common 2; local $+3$; non-local $+1$.}
+\label{tab:pde}
+\begin{tabular}{lcc}
+\toprule
+Model & BTCUSDT & ETHUSDT \\
+\midrule
+Common (cancellation + source) & 0.653 [0.614, 0.717] & 0.389 [0.341, 0.477] \\
++ local (diffusion + drift)    & 0.643 [0.559, 0.725] & 0.388 [0.338, 0.477] \\
++ non-local jump               & 0.652 [0.610, 0.721] & 0.410 [0.328, 0.479] \\
++ both                         & 0.640 [0.566, 0.728] & 0.408 [0.322, 0.481] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Adding local diffusion never improves out-of-sample fit. In the full-sample fit the diffusion
+coefficient is zero in every step for BTC and at most 0.03 per step for ETH. The jump rate is
+positive only between 40 and 100\,ms (BTC $\kappa=0.09$ at 40--60\,ms; ETH 0.07 and 0.05 at
+40--60 and 60--100\,ms), when repositioning is strongest, and the non-local model improves on
+the common model for ETH (0.410 vs 0.389) but not for BTC. Profile snapshots alone identify the
+non-local jump only weakly, because a jump and a near-touch source both add mass at the touch;
+separating them requires the flow decomposition of Section~\ref{sec:results}. The two kinds of
+evidence agree: there is no local diffusion component at these horizons, and the near-touch
+rebuild comes from non-local reallocation and a source.
 
 %----------------------------------------------------------------------------------------------
 \section{Related literature}
@@ -340,6 +403,9 @@ replace ordinary diffusion with a fractional, non-local operator, and \citet{dia
 simulate fractional-diffusion order books. \citet{cont2021spde} model the observed book density
 as a stochastic PDE around the mid price and calibrate it to the average profile, and
 \citet{hambly2024porous} study a stochastic porous-medium equation motivated by the order book.
+\citet{mahseredjian2025migration} derives a diffusion limit of a Hawkes-driven book in which
+liquidity migrates between neighbouring price levels, so that the limit contains a local
+diffusion term; our out-of-sample fits find no role for such a term after sweeps.
 To our knowledge these models have not been confronted with the conditional, post-shock
 dynamics of the depth profile. Our evidence supports their non-local variants over local
 diffusion at the horizons we study.
@@ -350,6 +416,15 @@ arrivals and cancellations as self- and cross-exciting
 \citep{huang2015queue}. They usually model event timing at the best limits or a few levels.
 Our decomposition is complementary: it measures where in the depth profile cancellations and
 additions occur after a shock, which constrains how such models should couple levels.
+
+\paragraph{Order flow around market orders.} \citet{bonart2017latency} study net order flow at
+the best quotes of five Nasdaq stocks before and after market orders and identify a sequence
+of phases: platform and response latency, a high-speed reaction with net outflow at the
+same-side best quote, and then net inflow consistent with stimulated refill.
+\citet{bechler2017meso} document that liquidity providers anticipating one-sided flow cancel
+resting orders after executions (``LOB fade''). Our withdrawal and source phases extend these
+best-quote patterns through the depth profile; the intermediate reallocation from deep to near
+levels has, to our knowledge, not been measured.
 
 \paragraph{Cancellations, quote fade and placement.} \citet{hasbrouck2009fleeting} document
 that a large share of limit orders are cancelled within seconds. \citet{MalinovaPark2016} show
@@ -395,7 +470,9 @@ grid; 95\% day-cluster bootstrap intervals (100 replications) in brackets.}
 \begin{itemize}
   \item \textbf{Level-2 data.} Without order identifiers we cannot show that the \emph{same}
         orders move; repositioning is identified from matched aggregate cancellation and
-        addition flows.
+        addition flows, and exact-size tracing finds few identical moves. We are recording
+        Bitstamp's public order-level feed, which carries order identifiers and in-place order
+        changes, to test this directly. \todo{Bitstamp order-level results.}
   \item \textbf{Push netting.} Each 20\,ms message nets changes at a price, so gross flows are
         lower bounds.
   \item \textbf{Fill matching.} About one third of sweep volume exceeds the displayed size at

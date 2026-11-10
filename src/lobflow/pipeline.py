@@ -154,6 +154,66 @@ def _write_flows(
     return int(t_pl.size)
 
 
+def process_moves_day(
+    parquet_root: Path,
+    out_root: Path,
+    exchange: str,
+    symbol: str,
+    day: str,
+    *,
+    n_placebo: int = 2000,
+    seed: int = 0,
+    lag_ms: int = 100,
+) -> dict[str, int]:
+    """Exact-size matching statistics (:mod:`lobflow.moves`) for sweeps and the identical
+    placebo design; writes ``{day}_moves.parquet`` (column ``set``: sweep / placebo)."""
+    from lobflow.moves import LogRow, common_sizes, log_frame, lot_size, move_stats
+
+    out = out_root / exchange / symbol
+    meta = json.loads((out / f"{day}_meta.json").read_text())
+    ev_path = out / f"{day}_events.parquet"
+    if not ev_path.exists():
+        return {"n_events": 0, "n_placebo": 0}
+    root = parquet_root / exchange
+    book = pl.read_parquet(root / "incremental_book_L2" / symbol / f"{day}.parquet")
+    trades = pl.read_parquet(root / "trades" / symbol / f"{day}.parquet").sort(
+        "timestamp", maintain_order=True
+    )
+    tk = float(meta["tick"])
+    arrays = load_book_arrays(book, "exchange")
+    runs = detect_sweeps(trades, tk, SweepParams(**meta["sweep_params"]))
+    ev = pl.read_parquet(ev_path).sort("event_id")
+    tr = (
+        trades["timestamp"].to_numpy().astype(np.int64),
+        trades["price"].to_numpy(),
+        trades["amount"].to_numpy(),
+        (trades["side"] == "buy").to_numpy(),
+    )
+    t_pl, pl_buy = placebo_design(runs, arrays["ts"], n_placebo, seed)
+    sets = {
+        "sweep": (ev["t0"].to_numpy().astype(np.int64), (ev["side"] == "buy").to_numpy()),
+        "placebo": (t_pl, pl_buy),
+    }
+    logs = {}
+    for name, (t0, is_buy) in sets.items():
+        raw: list[LogRow] = []
+        flow_panel(arrays, *tr, t0, is_buy, tk, edges_ms=(0, 1000), log=raw)
+        logs[name] = log_frame(raw)
+    common = common_sizes(list(logs.values()))
+    lot = lot_size(list(logs.values()))
+    stats = pl.concat(
+        [
+            move_stats(lg, common, lot, lag_ms=lag_ms).with_columns(pl.lit(name).alias("set"))
+            for name, lg in logs.items()
+        ]
+    )
+    stats.write_parquet(out / f"{day}_moves.parquet")
+    log.info(
+        "%s %s %s: moves for %d events, %d placebo", exchange, symbol, day, ev.height, t_pl.size
+    )
+    return {"n_events": ev.height, "n_placebo": int(t_pl.size)}
+
+
 def process_state_day(
     parquet_root: Path,
     out_root: Path,

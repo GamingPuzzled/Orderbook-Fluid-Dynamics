@@ -340,3 +340,24 @@ Withdrawal phase = multi-level "quote fade" (Malinova & Park 2016); cite as prec
 - Fixed level bins are uninformative: median sweep clears 70 (BTC) / 44 (ETH) ticks.
 - Cron script now chains fine-grid flows → model → robustness per symbol (`--max-push-ms`
   passed through: 20 Bybit, 30 Binance).
+
+### 15.8 Weak-point fixes (2026-11-10)
+
+- **Exact-size matching** (`lobflow moves`, src/lobflow/moves.py): near-touch adds of rare
+  sizes matched to cancels at strictly deeper prices within 100 ms (either order) vs one-lot-off
+  sizes (coincidence). Exact ≈ 4× control (BTC 1.4% vs 0.3%; ETH 1.4% vs 0.4%) but only ~1% of
+  near-add volume and **no post-sweep excess vs NN placebo**. First version (same-price pairs,
+  time-reversal control) was confounded: an order added near and cancelled after the frame
+  moved matches itself; make-before-break quoting invalidates time reversal. → Paper now calls
+  repositioning an aggregate reallocation (resized / different orders). Power limited by 20 ms
+  netting.
+- **Model comparison** (`lobflow pde`, src/lobflow/pde.py): one-step profile prediction, 5-fold
+  by day. Diffusion adds nothing out of sample (BTC R² 0.643 vs common 0.653; ETH 0.388 vs
+  0.389); D = 0 all BTC steps, ≤ 0.03 ETH. Jump κ > 0 only 40–100 ms; non-local helps ETH
+  (0.410) not BTC. Profiles alone weakly separate jump vs source → flows needed.
+- **OKX** phase added to cron (Nov 12 23:00; okex-swap BTC-USDT-SWAP, 12 quarterly days).
+  Exchange id unverified (Tardis 429 at time of writing).
+- **Bitstamp L3 recorder** (scripts/record_bitstamp.py): public `live_orders` + `live_trades`
+  with order IDs, REST snapshot (group=2) on each connect. Coinbase `full` now needs auth.
+- **Literature**: Bonart & Gould 2017 is the closest precedent (best-quote phases); see
+  literature_review §13.

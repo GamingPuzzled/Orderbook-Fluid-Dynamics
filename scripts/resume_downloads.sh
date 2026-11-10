@@ -2,7 +2,8 @@
 # Resume rate-limited Tardis downloads in phases (run from cron; idempotent: finished days skip).
 #   resume_downloads.sh bybit    -> SOL, XRP, LINK (Bybit), then analyze each
 #   resume_downloads.sh binance  -> Binance futures BTCUSDT, 12 quarterly days, then analyze
-# After each symbol: fine-grid flows, three-component model, robustness table.
+#   resume_downloads.sh okx      -> OKX BTC-USDT-SWAP (tick-by-tick book), 12 quarterly days
+# After each symbol: fine-grid flows, three-component model, robustness, size matching, PDE fit.
 # Removes its own crontab line after running so each phase fires once.
 set -u
 EDGES=0,20,40,60,80,100,140,200,300,450,650,1000
@@ -13,6 +14,8 @@ post() {  # post <exchange> <symbol> <max push ms>: fine flows -> model -> robus
     --workers 1 ${=P} >> "$LOG" 2>&1
   $UV run lobflow model --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
   $UV run lobflow robustness --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
+  $UV run lobflow moves --exchange "$1" --symbol "$2" --workers 2 ${=P} > /dev/null 2>> "$LOG"
+  $UV run lobflow pde --exchange "$1" --symbol "$2" ${=P} > /dev/null 2>> "$LOG"
   echo "$2 post exit $?" >> "$LOG"
 }
 PHASE="$1"
@@ -31,6 +34,14 @@ case "$PHASE" in
       echo "$SYM exit $?" >> "$LOG"
       post bybit $SYM 20
     done
+    ;;
+  okx)
+    D=2023-11-01,2024-02-01,2024-05-01,2024-08-01,2024-11-01,2025-02-01,2025-05-01,2025-08-01,2025-11-01,2026-02-01,2026-05-01,2026-08-01
+    $UV run lobflow batch --exchange okex-swap --symbol BTC-USDT-SWAP --start 2023-11-01 \
+      --end 2026-08-01 --days $D --prune-raw --workers 1 >> "$LOG" 2>&1
+    $UV run lobflow analyze --exchange okex-swap --symbol BTC-USDT-SWAP > /dev/null 2>> "$LOG"
+    echo "okx exit $?" >> "$LOG"
+    post okex-swap BTC-USDT-SWAP 20
     ;;
   binance)
     D=2023-11-01,2024-02-01,2024-05-01,2024-08-01,2024-11-01,2025-02-01,2025-05-01,2025-08-01,2025-11-01,2026-02-01,2026-05-01,2026-08-01

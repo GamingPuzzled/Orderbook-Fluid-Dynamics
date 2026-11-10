@@ -8,3 +8,4 @@ __pycache__/
 logs/
 *.part
 .DS_Store
+paper_overleaf.zip

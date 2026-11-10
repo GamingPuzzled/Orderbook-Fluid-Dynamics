@@ -73,8 +73,14 @@ def flow_panel(
     n_levels: int = 50,
     fill_tol_us: int = 5_000,
     fill_expiry_us: int = 100_000,
+    log: list[tuple[int, int, int, int, float, int]] | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Return (flows, info).
+
+    If ``log`` is given, every swept-side ``add`` and pure ``cancel`` (no fill part) is
+    appended as ``(event, t_us since t0, d, +1 add / -1 cancel, size, depth_px)`` with
+    ``depth_px`` = price in ticks, signed so larger = deeper on that side, for order-level tests
+    (:mod:`lobflow.moves`).
 
     ``flows``: long table (event_id, window, side, zone, metric, value) of summed sizes.
     ``add_cofar`` is swept-side addition volume in messages that also contain a far-zone
@@ -186,14 +192,18 @@ def flow_panel(
                         cell[m_add] += delta
                         if s == 0:
                             near_adds.append((z, delta))
+                            if log is not None:
+                                log.append((e, m_ts - start, d, 1, delta, _dpx(px, sgn[s], tick)))
                     continue
                 rem = -delta
                 pool = pools[s].get(px)
+                had_fill = False
                 if pool is not None and pool[0] > 0 and m_ts - pool[1] <= fill_expiry_us:
                     f = min(rem, pool[0])
                     pool[0] -= f
                     rem -= f
                     cell[m_fill] += f
+                    had_fill = f > 0
                     if s == 0:
                         filled[e, w] += f
                 if rem <= 0:
@@ -202,6 +212,8 @@ def flow_panel(
                     cell[m_eout] += rem
                 else:
                     cell[m_can] += rem
+                    if s == 0 and log is not None and not had_fill:
+                        log.append((e, m_ts - start, d, -1, rem, _dpx(px, sgn[s], tick)))
                     if s == 0 and d >= FAR_MIN_D:
                         far_cancel = True
             if far_cancel:
@@ -244,6 +256,10 @@ def _push_budget(
         )
         out.update((s, px) for px in cands[:n_ins])
     return out
+
+
+def _dpx(px: float, sgn: int, tick: float) -> int:
+    return int(round(px * sgn / tick))
 
 
 def _side_dict(px: F64, sz: F64) -> dict[float, float]:

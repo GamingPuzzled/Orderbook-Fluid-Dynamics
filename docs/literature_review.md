@@ -200,3 +200,24 @@ withdrawal, depth-conserving repositioning toward the touch, and net new liquidi
 ordering and timing (withdrawal ≈ 50–110 ms → repositioning ≈ 130–360 ms → source ≈ 450 ms);
 (iii) on crypto perpetuals at 20 ms. Frame withdrawal as multi-level quote fade and cite
 Malinova–Park as the precursor; the contribution is the decomposition and sequencing.
+
+## 13. Deeper novelty check (2026-11-10)
+
+Six extended web searches (refill/cancellation/mass balance; crypto perp millisecond
+replenishment; cancel-and-resubmit beyond best; post-shock SPDE calibration; "stimulated refill"
+by level; 2025–26 crypto order-level resilience) plus arXiv/Crossref metadata checks.
+
+| Work | Finding | Overlap |
+|---|---|---|
+| **Bonart & Gould, QF 17(10):1601–1616, 2017** (arXiv 1511.04116) ✔ PDF p.1–6 read | Nasdaq LOBSTER, 5 large-tick stocks: after market orders, net flow at the **best quotes** passes through phases — platform latency (0), response latency (small +), **high-speed reaction** (strong net outflow same side), then **stimulated refill** (net inflow) | **Closest precedent for phase structure.** Best quotes only; any market order (not multi-level sweeps); no depth profile, no deep→near reallocation, no source split. Our withdrawal / source = multi-level analogues. Must be cited in intro + contribution |
+| Bechler & Ludkovski, Market Microstructure & Liquidity 3(3–4) 1850006, 2017 ✔ (abstract) | Meso-scale flows; "LOB fade": providers anticipating one-sided flow cancel after executions | Aggregate/volume buckets; supports withdrawal |
+| Mahseredjian, arXiv 2511.18117 (2025) ✔ (abstract) | Hawkes-driven book with **migration between neighbouring levels** → diffusion limit (discrete Laplacian); calibration listed as future work | Theory with *local* migration; our out-of-sample fits find no diffusion term → direct empirical counterpoint |
+| Gu et al., JSTAT 2013 P04027 ✔ | Cancellation position profiles (Shenzhen) | Unconditional |
+| Lim, SSRN 6636998 (2026) ◐ | Hyperliquid, minute data, two-regime recovery after Oct-10-2025 cascade | Minutes–weeks scale; not ms |
+| Hambly, Kalsi, Newbould (reflected SPDE limits) ◐ | Micro→macro LOB limits, calibration discussed | Unconditional |
+
+Verdict: phases of net order flow after market orders are **known at the best quotes**
+(Bonart–Gould). Still not found: multi-level depth-profile mass balance separating withdrawal,
+depth-conserving deep→near reallocation and new liquidity; their timing after multi-level
+sweeps; out-of-sample test of local vs non-local continuum terms post-shock; crypto at 20 ms.
+Novelty claim narrowed accordingly in paper (contribution paragraph).

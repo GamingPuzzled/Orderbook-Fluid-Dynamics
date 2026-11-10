@@ -182,6 +182,56 @@ def _cmd_flows(a: argparse.Namespace) -> int:
     return 1 if _run_days(_flows_day, jobs, a.workers) else 0
 
 
+def _moves_day(parquet: Path, events: Path, exchange: str, symbol: str, day: str) -> int:
+    from lobflow.pipeline import process_moves_day
+
+    try:
+        process_moves_day(parquet, events, exchange, symbol, day)
+        return 0
+    except Exception:
+        log.exception("moves failed for %s %s %s", exchange, symbol, day)
+        return 1
+
+
+def _main_days(out: Path, max_push_ms: float) -> list[str]:
+    """Processed days whose feed meets the main-sample spec."""
+    import json
+
+    days = []
+    for f in sorted(out.glob("*_meta.json")):
+        m = json.loads(f.read_text())
+        fd = m["feed"]
+        if (
+            fd["push_interval_ms_p50"] <= max_push_ms
+            and (min(fd["snapshot_levels_bid"], fd["snapshot_levels_ask"]) >= 50)
+            and (out / f"{m['day']}_events.parquet").exists()
+        ):
+            days.append(m["day"])
+    return days
+
+
+def _cmd_moves(a: argparse.Namespace) -> int:
+    from lobflow.moves import run_moves
+
+    out = Path(a.events) / a.exchange / a.symbol
+    days = _main_days(out, a.max_push_ms)
+    todo = [d for d in days if a.overwrite or not (out / f"{d}_moves.parquet").exists()]
+    jobs = [(Path(a.parquet), Path(a.events), a.exchange, a.symbol, d) for d in todo]
+    failed = _run_days(_moves_day, jobs, a.workers)
+    res = Path(a.results) / a.exchange / a.symbol
+    print(run_moves(out, res, max_push_ms=a.max_push_ms))
+    return 1 if failed else 0
+
+
+def _cmd_pde(a: argparse.Namespace) -> int:
+    from lobflow.pde import run_pde
+
+    out = Path(a.events) / a.exchange / a.symbol
+    res = Path(a.results) / a.exchange / a.symbol
+    print(run_pde(out, res, max_push_ms=a.max_push_ms, n_folds=a.folds))
+    return 0
+
+
 def _cmd_model(a: argparse.Namespace) -> int:
     from lobflow.model import run_model
 
@@ -282,6 +332,26 @@ def build_parser() -> argparse.ArgumentParser:
     mo.add_argument("--n-boot", type=int, default=200)
     mo.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     mo.set_defaults(fn=_cmd_model)
+
+    mv = sub.add_parser("moves", help="exact-size matching test for order repositioning")
+    mv.add_argument("--exchange", required=True)
+    mv.add_argument("--symbol", required=True)
+    mv.add_argument("--parquet", default="data/parquet")
+    mv.add_argument("--events", default="data/events")
+    mv.add_argument("--results", default="results")
+    mv.add_argument("--workers", type=int, default=1)
+    mv.add_argument("--overwrite", action="store_true")
+    mv.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
+    mv.set_defaults(fn=_cmd_moves)
+
+    pd_ = sub.add_parser("pde", help="out-of-sample local vs non-local continuum model fit")
+    pd_.add_argument("--exchange", required=True)
+    pd_.add_argument("--symbol", required=True)
+    pd_.add_argument("--events", default="data/events")
+    pd_.add_argument("--results", default="results")
+    pd_.add_argument("--folds", type=int, default=5)
+    pd_.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
+    pd_.set_defaults(fn=_cmd_pde)
 
     ro = sub.add_parser("robustness", help="matching comparison and subset robustness table")
     ro.add_argument("--exchange", required=True)
