@@ -39,7 +39,8 @@ in which flows depend only on the current state of the book, fails, so time sinc
 matters beyond the book's state; and a local diffusion term adds no predictive power for the
 depth profile. On three thinner, large-tick books (SOLUSDT, XRPUSDT, LINKUSDT), withdrawal,
 early net depletion and the delayed source replicate, but repositioning, which on BTC and ETH
-moves liquidity by less than 1--2 basis points, is absent or finer than the tick grid.
+moves liquidity by less than 1--2 basis points, is absent or finer than the tick grid; on
+the Binance BTC perpetual, with the same small tick, repositioning reappears.
 The excess cost of a follow-up market order falls by about 90\% within 250\,ms, during
 repositioning, while total depth is still below normal. The results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
 a state-dependent cancellation rate and a delayed source replace the diffusion term.
@@ -110,7 +111,8 @@ same whether or not the price later continues in the sweep's direction
 (Section~\ref{sec:info}): refill is a reaction to the sweep itself, timed from it, not a
 response to the book's state or to the sweep's information content. On three thinner Bybit
 books with large ticks (SOL, XRP, LINK), withdrawal, early net depletion and the delayed source
-replicate, but repositioning does not. On BTC and ETH most moved liquidity travels less than
+replicate, but repositioning does not, while it reappears on the Binance BTC perpetual,
+whose tick is as small as Bybit's. On BTC and ETH most moved liquidity travels less than
 1--2\,bp, which on XRP and LINK lies inside the near zone; on SOL, where the grid is fine
 enough to see such moves, repositioning is an order of magnitude smaller, and on the
 large-tick books the excess execution cost decays far more slowly
@@ -698,6 +700,22 @@ fast recovery of execution cost, is therefore a feature of the deep, small-tick 
 books; withdrawal, early net depletion and a delayed source of new liquidity are common to
 all five.
 
+\paragraph{Another venue.} The Binance BTCUSDT perpetual has the same relative tick as Bybit
+BTCUSDT (0.016\,bp) but a different participant base, so it separates the tick from the
+venue. Its free Tardis feed publishes about 1{,}000 levels every 52\,ms; we replay the full
+book but classify changes only within the best 50 levels per side, as on Bybit (deep levels of
+the full-depth feed go stale, which otherwise appears as spurious additions; with the
+restriction, added $\div$ cancelled at placebo times is 1.05). On four days so far (1{,}241
+sweeps; the 52\,ms push interval blurs the first two windows), the pattern is the BTC one.
+Additions fall short of cancellations at 20--40\,ms ($\kappa = 0.58$, interval
+$[0.13, 0.93]$) and exceed them at 250--1000\,ms (1.11, as on Bybit); withdrawal before
+250\,ms is 0.22 of pre-sweep depth, the same as on Bybit; repositioning is 0.063
+($[0.039, 0.079]$), about a third of Bybit's 0.17 but clearly positive, and supplies the whole
+near-touch rebuild before 250\,ms; and the follow-up execution excess falls to 16\% of its
+20\,ms value by 250\,ms (Bybit 13\%). Phase centroids are 99, 207 and 501\,ms. Fast
+repositioning therefore appears on both small-tick BTC books, on two venues, and on none of
+the large-tick books.
+
 \begin{table}[ht]
 \centering
 \caption{Repositioning distance. Excess repositioning before 250\,ms (fraction of pre-sweep
@@ -743,8 +761,9 @@ share, and the timing of the three phases (95\% day-cluster intervals).}
         size so it cannot absorb later cancellations.
   \item \textbf{Venue and assets.} One derivatives venue. The full three-phase structure
         holds for its two deepest books; on three thinner, large-tick books repositioning is
-        either absent (SOL) or finer than the tick grid can resolve (XRP, LINK). \todo{Binance
-        and OKX BTC perpetuals.}
+        either absent (SOL) or finer than the tick grid can resolve (XRP, LINK). The second
+        derivatives venue (Binance) has four days so far and a 52\,ms feed.
+        \todo{Binance: all 12 days.}
 \end{itemize}
 
 %----------------------------------------------------------------------------------------------
