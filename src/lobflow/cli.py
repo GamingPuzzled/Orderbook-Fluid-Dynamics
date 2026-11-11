@@ -89,11 +89,11 @@ def _batch_day(
     d = date.fromisoformat(day)
     try:
         for dt in ("incremental_book_L2", "trades"):
-            spec = DatasetSpec(exchange, dt, d, symbol)
-            src = download(spec, raw)
             dest = pq_root / exchange / dt / symbol / f"{day}.parquet"
-            if not dest.exists():
-                csv_gz_to_parquet(src, dest, dt)
+            if dest.exists():  # already converted: no download (saves the rate-limit quota)
+                continue
+            src = download(DatasetSpec(exchange, dt, d, symbol), raw)
+            csv_gz_to_parquet(src, dest, dt)
             if prune_raw:
                 src.unlink(missing_ok=True)
         process_day(pq_root, out, exchange, symbol, day, tick=tick)

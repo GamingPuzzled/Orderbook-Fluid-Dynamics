@@ -25,10 +25,17 @@ Zones: distance ``d`` in ticks from the *opposite* side's best quote just before
 (moving frame, same as ``profiles``). Feed caveat: each message is a net change per price over
 one push interval (20 ms on Bybit ``orderbook.50``), so a cancel and an add at one price
 within one push cancel out; gross flows are lower bounds.
+
+Full-depth feeds (snapshot deeper than 2 × ``n_levels``, e.g. Binance with ~1000 levels) are
+seen through a top-``n_levels`` window: the full book is replayed, but only changes of the
+visible top levels are classified, exactly as on a top-N feed. Deep levels of such feeds go
+stale (no removal message once they drift out of the published range), which otherwise
+shows up as spurious additions at placebo times.
 """
 
 from __future__ import annotations
 
+import heapq
 from collections.abc import Sequence
 
 import numpy as np
@@ -46,6 +53,20 @@ METRICS: tuple[str, ...] = ("add", "cancel", "fill", "edge_in", "edge_out", "add
 NEAR_MAX_D = 5  # near zone: d <= 5
 FAR_MIN_D = 11  # far zone: d >= 11
 SIDES: tuple[str, ...] = ("swept", "opp")
+
+
+def snapshot_depth(is_snapshot: npt.NDArray[np.bool_], is_bid: npt.NDArray[np.bool_]) -> int:
+    """Levels per side in the largest snapshot (max over runs of snapshot rows and sides)."""
+    if not is_snapshot.any():
+        return 0
+    snap = is_snapshot.astype(np.int8)
+    starts = np.flatnonzero(np.diff(np.concatenate([[0], snap])) == 1)
+    ends = np.flatnonzero(np.diff(np.concatenate([snap, [0]])) == -1) + 1
+    best = 0
+    for a, b in zip(starts, ends, strict=True):
+        n_bid = int(is_bid[a:b].sum())
+        best = max(best, n_bid, int(b - a) - n_bid)
+    return best
 
 
 def zone_labels() -> list[str]:
@@ -104,7 +125,15 @@ def flow_panel(
     price = book_arrays["price"]
     amount = book_arrays["amount"]
 
-    pre = sample_arrays(book_arrays, t0 - 1, n_levels=4 * n_levels)
+    # pre-shock book deep enough to hold every published level: otherwise a size change at a
+    # level beyond the sampled depth (full-depth feeds such as Binance) looks like a new
+    # level of full size, and its later removal is lost
+    published = snapshot_depth(snap, is_bid)
+    pre_levels = max(4 * n_levels, 2 * published)
+    pre = sample_arrays(book_arrays, t0 - 1, n_levels=pre_levels)
+    # full-depth feed: classify changes of the top-n_levels view only, as on a top-N feed
+    # (deep levels of a full-depth feed go stale without removal messages)
+    emulate = published > 2 * n_levels
     acc = np.zeros((n_ev, n_win, 2, len(ZONES), len(METRICS)))
     traded = np.zeros((n_ev, n_win))
     filled = np.zeros((n_ev, n_win))
@@ -126,9 +155,10 @@ def flow_panel(
             continue
         buy = bool(is_buy[e])
         # side 0 = swept (asks for a buy sweep), side 1 = opposite
-        books = (asks, bids) if buy else (bids, asks)
+        full = (asks, bids) if buy else (bids, asks)
         # sign: +1 if deeper = higher price on that side (asks), -1 for bids
         sgn = (1, -1) if buy else (-1, 1)
+        books = tuple(_top(full[s], n_levels, sgn[s]) for s in (0, 1)) if emulate else full
         depth_pre[e] = [sum(books[0].values()), sum(books[1].values())]
 
         j0 = int(np.searchsorted(trades_ts, start, side="left"))
@@ -164,16 +194,27 @@ def flow_panel(
             full_before = [len(books[s]) >= n_levels for s in (0, 1)]
             best_before = [_best(books[s], sgn[s]) for s in (0, 1)]
             changes: list[tuple[int, float, float, float]] = []  # (side, px, old, new)
+            touched = set()
             for r in range(i, k):
                 s = 0 if (bool(is_bid[r]) != buy) else 1
                 px, new = float(price[r]), float(amount[r])
-                old = books[s].get(px, 0.0)
+                old = full[s].get(px, 0.0)
                 if new == 0.0:
-                    books[s].pop(px, None)
+                    full[s].pop(px, None)
                 else:
-                    books[s][px] = new
-                if new != old:
+                    full[s][px] = new
+                if emulate:
+                    touched.add(s)
+                elif new != old:
                     changes.append((s, px, old, new))
+            for s in sorted(touched):
+                vis = _top(full[s], n_levels, sgn[s])
+                for px in vis.keys() | books[s].keys():
+                    old, new = books[s].get(px, 0.0), vis.get(px, 0.0)
+                    if new != old:
+                        changes.append((s, px, old, new))
+                books[s].clear()
+                books[s].update(vis)
             deep_after = [_deepest(books[s], sgn[s]) for s in (0, 1)]
             push_budget = _push_budget(changes, deep_before, deep_after, sgn)
             far_cancel = False
@@ -271,6 +312,12 @@ def _deepest(book: dict[float, float], sgn: int) -> float:
     if not book:
         return float("nan")
     return max(book) if sgn > 0 else min(book)
+
+
+def _top(book: dict[float, float], n: int, sgn: int) -> dict[float, float]:
+    """The ``n`` best levels (lowest asks for sgn > 0, highest bids for sgn < 0)."""
+    pick = heapq.nsmallest if sgn > 0 else heapq.nlargest
+    return {px: book[px] for px in pick(n, book)}
 
 
 def _best(book: dict[float, float], sgn: int) -> float:

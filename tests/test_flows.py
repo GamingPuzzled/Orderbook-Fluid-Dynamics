@@ -150,3 +150,35 @@ def test_hidden_trade_volume_does_not_absorb_later_cancel() -> None:
     )
     assert _get(flows, metric="fill", side="swept") == pytest.approx(1.0)
     assert _get(flows, metric="cancel", side="swept") == pytest.approx(0.8)
+
+
+def test_full_depth_feed_is_seen_through_top_n_window() -> None:
+    """A full-depth feed (snapshot far deeper than n_levels, as on Binance) is classified as a
+    top-n_levels feed: changes beyond the visible window are ignored, changes inside count by
+    their size difference, and a level entering the window after a cancel is edge_in."""
+    n_ask = 30
+    rows = [(0, True, True, 100.0, 5.0)]
+    rows += [(0, True, False, 100.5 + 0.5 * k, 1.0) for k in range(n_ask)]
+    t0 = 1_000_000
+    deep = 100.5 + 0.5 * 25
+    rows += [(t0 + 5_000, False, False, deep, 1.5)]  # invisible: ignored
+    rows += [(t0 + 6_000, False, False, deep + 0.5, 0.0)]  # invisible: ignored
+    rows += [(t0 + 7_000, False, False, 101.0, 1.4)]  # visible level 2: +0.4 add
+    rows += [(t0 + 8_000, False, False, 101.5, 0.0)]  # visible level 3 cancelled
+    empty = np.array([], dtype=np.int64)
+    flows, info = flow_panel(
+        _arrays(rows),
+        empty,
+        np.array([]),
+        np.array([]),
+        np.array([], dtype=bool),
+        np.array([t0], dtype=np.int64),
+        np.array([True]),
+        TICK,
+        edges_ms=(0, 20),
+        n_levels=4,
+    )
+    assert _get(flows, metric="add", side="swept") == pytest.approx(0.4)
+    assert _get(flows, metric="cancel", side="swept") == pytest.approx(1.0)
+    assert _get(flows, metric="edge_in", side="swept") == pytest.approx(1.0)  # level 5 enters
+    assert info["depth_pre_swept"][0] == pytest.approx(4.0)  # top-4 view
