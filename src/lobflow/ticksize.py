@@ -185,3 +185,80 @@ def run_ticksize(
     text = "\n".join(lines) + "\n"
     (results_dir / "ticksize.md").write_text(text)
     return text
+
+
+def near_hazard_days(out_dir: Path, *, max_push_ms: float = 20.0) -> pl.DataFrame:
+    """Per day at placebo times: near-touch (d ≤ 5) swept-side cancelled and added volume over
+    the first second, and near-touch depth just before (sums over placebo times)."""
+    from lobflow.analysis import load_outputs
+
+    days = load_outputs(out_dir, max_push_ms=max_push_ms)["meta"].filter(pl.col("ok"))["day"]
+    rows = []
+    for d in days.to_list():
+        prof = pl.read_parquet(
+            out_dir / f"{d}_placebo.parquet", columns=["tau_ms", "d", "depth"]
+        ).filter((pl.col("tau_ms") == -1) & (pl.col("d") <= 5))
+        f = pl.read_parquet(out_dir / f"{d}_flowsfine_placebo.parquet").filter(
+            (pl.col("side") == "swept") & (pl.col("zone") == "1-5")
+        )
+        rows.append(
+            {
+                "day": d,
+                "depth": float(prof["depth"].sum()),
+                "cancel": float(f.filter(pl.col("metric") == "cancel")["value"].sum()),
+                "add": float(f.filter(pl.col("metric") == "add")["value"].sum()),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def run_hazard(
+    events_root: Path,
+    results_dir: Path,
+    assets: Sequence[tuple[str, str, float]],
+    *,
+    n_boot: int = 1000,
+    seed: int = 0,
+) -> str:
+    """Near-touch cancellation rate at placebo times (cancelled ÷ resting depth per second) by
+    asset, with day-bootstrap CIs; writes ``hazard.md`` and ``hazard.parquet``.
+
+    If queue position is valuable when the tick is large, resting orders near the touch on
+    large-tick books should be cancelled (and re-posted) less often in normal times."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for exchange, symbol, push in assets:
+        p = near_hazard_days(events_root / exchange / symbol, max_push_ms=push)
+        dep, can = p["depth"].to_numpy(), p["cancel"].to_numpy()
+        idx = rng.integers(0, len(p), (n_boot, len(p)))
+        draws = can[idx].sum(1) / dep[idx].sum(1)
+        rows.append(
+            {
+                "exchange": exchange,
+                "symbol": symbol,
+                "days": len(p),
+                "cancel_rate": float(can.sum() / dep.sum()),
+                "lo": float(np.percentile(draws, 2.5)),
+                "hi": float(np.percentile(draws, 97.5)),
+            }
+        )
+    table = pl.DataFrame(rows)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    table.write_parquet(results_dir / "hazard.parquet")
+    lines = [
+        "# Near-touch cancellation rate at placebo times",
+        "",
+        "Swept-side cancelled volume at d ≤ 5 ticks over the first second after placebo times, "
+        "divided by the resting depth at d ≤ 5 just before (per second). 95% day bootstrap.",
+        "",
+        "| venue | asset | days | cancel rate (1/s) | 95% CI |",
+        "|---|---|---|---|---|",
+        *[
+            f"| {r['exchange']} | {r['symbol']} | {r['days']} | {r['cancel_rate']:.2f} | "
+            f"[{r['lo']:.2f}, {r['hi']:.2f}] |"
+            for r in table.iter_rows(named=True)
+        ],
+    ]
+    text = "\n".join(lines) + "\n"
+    (results_dir / "hazard.md").write_text(text)
+    return text

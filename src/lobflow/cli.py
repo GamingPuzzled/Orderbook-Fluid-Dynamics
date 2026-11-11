@@ -324,6 +324,17 @@ def _cmd_ticksize(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_hazard(a: argparse.Namespace) -> int:
+    from lobflow.ticksize import run_hazard
+
+    assets = []
+    for x in a.assets.split(","):
+        e, s, push = x.split(":")
+        assets.append((e, s, float(push)))
+    print(run_hazard(Path(a.events), Path(a.results), assets, n_boot=a.n_boot))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="lobflow")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -502,6 +513,18 @@ def build_parser() -> argparse.ArgumentParser:
     ts.add_argument("--n-boot", type=int, default=500)
     ts.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     ts.set_defaults(fn=_cmd_ticksize)
+
+    hz = sub.add_parser("hazard", help="near-touch cancellation rate at placebo times by asset")
+    hz.add_argument(
+        "--assets",
+        default="bybit:BTCUSDT:20,bybit:ETHUSDT:20,binance-futures:BTCUSDT:60,"
+        "bybit:SOLUSDT:20,bybit:XRPUSDT:20,bybit:LINKUSDT:20",
+        help="comma-separated exchange:symbol:max_push_ms",
+    )
+    hz.add_argument("--events", default="data/events")
+    hz.add_argument("--results", default="results/pooled")
+    hz.add_argument("--n-boot", type=int, default=1000)
+    hz.set_defaults(fn=_cmd_hazard)
     return ap
 
 

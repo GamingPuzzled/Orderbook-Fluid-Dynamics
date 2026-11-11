@@ -63,16 +63,36 @@ def csv_gz_to_parquet(src: Path, dest: Path, data_type: str, *, block_size: int 
     return rows
 
 
-def infer_tick_size(prices: np.ndarray, *, decimals: int = 10) -> float:
-    """Infer tick size as the smallest positive gap between distinct observed prices.
+def infer_tick_size(prices: np.ndarray, *, decimals: int = 10, min_share: float = 0.999) -> float:
+    """Infer the tick size from book prices.
 
-    Use on a book file with many levels (not trades), where adjacent ticks are observed.
+    Candidates are the smallest positive gap between distinct prices and the standard steps
+    (1, 2, 2.5, 5) × 10^k up to 1000 times that gap; the tick is the largest candidate on
+    whose grid at least ``min_share`` of the price updates lie. A few off-grid prices (seen on
+    Binance futures, where a handful of updates per day sit one cent off the 0.1 grid) would
+    otherwise make the smallest gap far too small. Use on a book file with many levels.
     """
-    uniq = np.unique(np.round(prices[np.isfinite(prices)], decimals))
+    p = prices[np.isfinite(prices)]
+    uniq = np.unique(np.round(p, decimals))
     if uniq.size < 2:
         raise ValueError("need at least two distinct prices to infer tick size")
     diffs = np.diff(uniq)
-    tick = float(np.round(diffs[diffs > 0].min(), decimals))
-    if tick <= 0:
+    base = float(np.round(diffs[diffs > 0].min(), decimals))
+    if base <= 0:
         raise ValueError("non-positive tick inferred")
+    k0 = int(np.floor(np.log10(base)))
+    steps = sorted(
+        {base}
+        | {
+            round(m * 10.0**k, decimals)
+            for k in range(k0, k0 + 4)
+            for m in (1.0, 2.0, 2.5, 5.0)
+            if base <= m * 10.0**k <= 1000 * base
+        }
+    )
+    tick = base
+    for t in steps:
+        r = p / t
+        if np.mean(np.abs(r - np.round(r)) < 1e-4) >= min_share:
+            tick = t
     return tick

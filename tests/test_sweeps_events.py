@@ -142,3 +142,13 @@ def test_truncated_feed_marks_unobserved_as_nan() -> None:
     pre = panel.filter(pl.col("tau_ms") == -1).sort("j")
     assert pre.filter(pl.col("j") == 4)["depth"][0] == 1.0  # 102.0 observed
     assert np.isnan(pre.filter(pl.col("j") == 5)["depth"][0])  # 102.5 beyond top-4
+
+
+def test_infer_tick_ignores_rare_off_grid_prices() -> None:
+    from lobflow.convert import infer_tick_size
+
+    rng = np.random.default_rng(0)
+    on_grid = np.round(43_000 + rng.integers(0, 5000, 100_000) * 0.1, 1)
+    stray = np.array([43_000.01, 43_123.47])  # two updates one cent off the 0.1 grid
+    assert infer_tick_size(np.concatenate([on_grid, stray])) == pytest.approx(0.1)
+    assert infer_tick_size(np.round(20_000 + rng.integers(0, 4000, 50_000) * 0.5, 1)) == 0.5
