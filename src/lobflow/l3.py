@@ -940,18 +940,20 @@ def run_l3(
         "Share of near-touch added volume that has a cancel of the identical amount (satoshi) "
         f"at a strictly deeper price within ±{lag_ms:.0f} ms. Controls: amount ±1 satoshi "
         "(`lot`); same rule against cancels 2 s later (`time`, captures repeated quote "
-        "sizes). `beyond` = exact − time.",
+        "sizes). `beyond` = exact − time. `excess` = sweep beyond − placebo beyond (sweeps and "
+        "placebo times resampled independently).",
         "",
         "| window (ms) | sweep exact | sweep lot | sweep time | sweep beyond | "
-        "placebo exact | placebo time | placebo beyond |",
-        "|---|---|---|---|---|---|---|---|",
+        "placebo exact | placebo time | placebo beyond | excess |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
+    s1, s0 = share[1], share[0]
+    excess = (s1["beyond"][0] - s0["beyond"][0], s1["beyond"][1] - s0["beyond"][1])
     for j, lab in enumerate(ml):
-        s1, s0 = share[1], share[0]
         lines.append(
             f"| {lab} | {fmt(s1['exact'][0][j])} | {fmt(s1['lot'][0][j])} | "
             f"{fmt(s1['time'][0][j])} | {ci(*s1['beyond'], j)} | {fmt(s0['exact'][0][j])} | "
-            f"{fmt(s0['time'][0][j])} | {ci(*s0['beyond'], j)} |"
+            f"{fmt(s0['time'][0][j])} | {ci(*s0['beyond'], j)} | {ci(*excess, j)} |"
         )
     lines += [
         "",
@@ -1007,5 +1009,17 @@ def run_l3(
                         "hi": float(_ci(d)[1][j]),
                     }
                 )
+    for j, lab in enumerate(ml):
+        lo, hi = _ci(excess[1])
+        rows.append(
+            {
+                "set": -1,  # sweep − placebo
+                "stat": "move_excess",
+                "bin": lab,
+                "est": float(excess[0][j]),
+                "lo": float(lo[j]),
+                "hi": float(hi[j]),
+            }
+        )
     pl.DataFrame(rows).write_parquet(results_dir / "l3_summary.parquet")
     return text
