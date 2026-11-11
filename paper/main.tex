@@ -19,31 +19,28 @@
 
 \begin{abstract}
 When an aggressive order sweeps through several price levels of a limit order book, how does
-the book refill, and where does the new depth come from? Continuum models of the order book
-describe liquidity as a density that diffuses between neighbouring prices; resilience models
-describe only the aggregate rate of recovery. We measure the spatial and temporal structure of
-refill directly, using 20-millisecond level-2 data from Bybit USDT perpetual futures (BTCUSDT
-and ETHUSDT, 85 days, 42{,}180 isolated multi-level sweeps) and a placebo matched on volume,
-volatility and depth. Measuring depth relative to the moving opposite quote and decomposing
-every book update into additions, cancellations and fills, we find that refill proceeds in
-three phases: (i) \emph{withdrawal}, a multi-level quote fade in which deep orders are
-cancelled from the moment of the sweep; (ii) \emph{repositioning}, a depth-conserving
-reallocation in which depth cancelled deep in the book is matched by depth posted near the new
-best quote, concentrated in the first $\sim$100\,ms and supplying 74--93\% of the
-near-touch rebuild in the first 250\,ms while total depth on the swept side \emph{falls}
-(additions/cancellations $=0.61$--$0.73$ at 20--40\,ms against $\approx 1.0$ in matched
-placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred at roughly
-0.4--0.8\,s. Out of sample, a parametric three-phase model of these flows beats exponential
-recovery and every model that omits repositioning or the source; a queue-reactive benchmark,
-in which flows depend only on the current state of the book, fails, so time since the sweep
-matters beyond the book's state; and a local diffusion term adds no predictive power for the
-depth profile. On three thinner, large-tick books (SOLUSDT, XRPUSDT, LINKUSDT), withdrawal,
-early net depletion and the delayed source replicate, but repositioning, which on BTC and ETH
-moves liquidity by less than 1--2 basis points, is absent or finer than the tick grid; on
-the Binance BTC perpetual, with the same small tick, repositioning reappears.
-The excess cost of a follow-up market order falls by about 90\% within 250\,ms, during
-repositioning, while total depth is still below normal. The results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
-a state-dependent cancellation rate and a delayed source replace the diffusion term.
+the book refill, and where does the new depth come from? Resilience models describe only the
+aggregate rate of recovery, and continuum models let liquidity diffuse between neighbouring
+prices. Using 20-millisecond level-2 data for Bybit BTC and ETH perpetual futures (85 days,
+42{,}180 isolated multi-level sweeps), we decompose every book update into additions,
+cancellations and fills, measured relative to the moving opposite quote and against placebo
+times matched on volume, volatility and depth. Refill proceeds in three phases:
+(i) \emph{withdrawal}, a multi-level quote fade from the moment of the sweep;
+(ii) \emph{repositioning}, concentrated in the first $\sim$100\,ms, in which depth cancelled
+deep in the book is re-posted near the new best quote, supplying 74--93\% of the near-touch
+rebuild while total depth on the swept side still \emph{falls} (additions/cancellations
+0.61--0.73 at 20--40\,ms against $\approx 1.0$ at placebo times); and (iii) genuinely new
+liquidity, centred at roughly 0.4--0.8\,s. A three-phase rate model and a linear-Hawkes
+response predict the flows on held-out days; exponential recovery and a queue-reactive
+benchmark, in which flows depend only on the book's state, do not; local diffusion adds no
+predictive power; and the phases are nearly the same whether or not the price later continues
+in the sweep's direction. Across six books, withdrawal and the delayed arrival of new
+liquidity are general, but repositioning is not: it reappears on the Binance BTC perpetual,
+whose tick is as small as Bybit's, and is absent on SOL and finer than the tick grid on XRP and LINK, the
+three large-tick books (most repositioned BTC and ETH liquidity moves less than 1--2 basis
+points). Where repositioning is present, the excess
+cost of a follow-up market order falls by about 90\% within 250\,ms; on the large-tick books
+most of it remains.
 \end{abstract}
 
 \noindent\textbf{Keywords:} limit order book; resilience; market making; quote fade;
@@ -109,14 +106,13 @@ repositioning or the source (Section~\ref{sec:param}). A queue-reactive benchmar
 depend only on current queue sizes, fails out of sample, and the early phases are nearly the
 same whether or not the price later continues in the sweep's direction
 (Section~\ref{sec:info}): refill is a reaction to the sweep itself, timed from it, not a
-response to the book's state or to the sweep's information content. On three thinner Bybit
-books with large ticks (SOL, XRP, LINK), withdrawal, early net depletion and the delayed source
-replicate, but repositioning does not, while it reappears on the Binance BTC perpetual,
-whose tick is as small as Bybit's. On BTC and ETH most moved liquidity travels less than
-1--2\,bp, which on XRP and LINK lies inside the near zone; on SOL, where the grid is fine
-enough to see such moves, repositioning is an order of magnitude smaller, and on the
-large-tick books the excess execution cost decays far more slowly
-(Section~\ref{sec:robust}). The
+response to the book's state or to the sweep's information content. Withdrawal and the
+delayed source also appear on three thinner Bybit books with large ticks (SOL, XRP, LINK) and
+on the Binance BTC perpetual, but repositioning appears only on the small-tick books: Bybit BTC
+and ETH and Binance BTC. On BTC and ETH most moved liquidity travels less than 1--2\,bp, which
+on XRP and LINK lies inside the near zone; on SOL, where the grid is fine enough to see such
+moves, repositioning is an order of magnitude smaller; and on the large-tick books the excess
+execution cost decays far more slowly (Section~\ref{sec:robust}). The
 best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
 
@@ -160,7 +156,8 @@ streams on the exchange clock rather than on receipt time.
 October 2026 (BTCUSDT) and November 2026 (ETHUSDT). Table~\ref{tab:sample} summarises it.
 For replication (Section~\ref{sec:robust}) we add the Bybit SOLUSDT, XRPUSDT and LINKUSDT
 perpetuals on the same first-of-month days and with the same feed filter (31, 21 and 25 days
-with matched placebo times).
+with matched placebo times), and the Binance BTCUSDT perpetual (four quarterly days so far;
+its feed publishes the full book every 52\,ms, see Section~\ref{sec:robust}).
 
 \begin{table}[ht]
 \centering
@@ -343,7 +340,7 @@ weighted least squares with day-bootstrap standard errors, from many starting po
 models are compared by five-fold cross-validation over days and by AIC
 (Table~\ref{tab:fitmodels}, Figure~\ref{fig:fitmodels}).
 
-Three results are robust across assets and both definitions of the deep book. First, the
+Three results are robust across BTC and ETH and both definitions of the deep book. First, the
 exponential recovery of resilience models (model A) fails out of sample (cross-validated $R^2$
 0.40 for BTC, 0.14 for ETH). Second, removing either repositioning (models C and H) or new
 liquidity (D) worsens the fit sharply ($\Delta$AIC 178--407 relative to the best phase
