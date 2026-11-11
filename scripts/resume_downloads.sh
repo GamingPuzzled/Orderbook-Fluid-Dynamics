@@ -52,10 +52,10 @@ case "$PHASE" in
     D=2023-11-01,2024-02-01,2024-05-01,2024-08-01,2024-11-01,2025-02-01,2025-05-01,2025-08-01,2025-11-01,2026-02-01,2026-05-01,2026-08-01
     $UV run lobflow batch --exchange binance-futures --symbol BTCUSDT --start 2023-11-01 \
       --end 2026-08-01 --days $D --prune-raw --workers 1 >> "$LOG" 2>&1
-    $UV run lobflow analyze --exchange binance-futures --symbol BTCUSDT --max-push-ms 30 \
+    $UV run lobflow analyze --exchange binance-futures --symbol BTCUSDT --max-push-ms 60 \
       > /dev/null 2>> "$LOG"
     echo "binance exit $?" >> "$LOG"
-    post binance-futures BTCUSDT 30
+    post binance-futures BTCUSDT 60
     ;;
   *)
     echo "unknown phase $PHASE" >> "$LOG"; exit 2

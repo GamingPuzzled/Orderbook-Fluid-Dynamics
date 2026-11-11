@@ -10,8 +10,9 @@ writes, for all of them at once:
 - figures/fig4_cross_asset.{png,pdf} (+ paper/figures copy): forest plot of κ(20–40) and the
   repositioning share, and the three phase centroids per asset.
 
-Rows missing an optional input (PDE, execution) show "--". New coins and venues appear
-automatically once their pipeline has run.
+Rows missing an optional input (PDE, execution) show "--". An asset whose placebo added ÷
+cancelled ratio lies outside PLACEBO_KAPPA is skipped: its flow accounting is broken.
+New coins and venues appear automatically once their pipeline has run.
 
 Usage: uv run python scripts/crossasset.py [--results results]
 """
@@ -34,6 +35,7 @@ from figures import AQUA, BLUE, ORANGE, TEXT_2, _save, _style  # noqa: E402
 
 VENUES = {"bybit": "Bybit", "binance-futures": "Binance", "okex-swap": "OKX"}
 MAIN_ORDER = ("BTC", "ETH", "SOL", "XRP", "LINK")
+PLACEBO_KAPPA = (0.9, 1.1)  # added ÷ cancelled at placebo times; outside = broken flow accounting
 MAX_SHORT = 0.2  # execution excess is censored if more walks than this run out of depth
 
 
@@ -50,13 +52,29 @@ class Row:
     tick_bp: float | None
 
 
+def placebo_kappa(d: Path) -> float:
+    """Added ÷ cancelled swept-side depth at placebo times, 20–1000 ms (≈ 1 if flows are
+    classified correctly: at random times the book neither grows nor shrinks quickly)."""
+    fb = pl.read_parquet(d / "flow_balance.parquet").filter(
+        (pl.col("set") == "placebo") & (pl.col("window") != "0-20")
+    )
+    return float(fb["add"].sum() / fb["cancel"].sum())
+
+
 def discover(results: Path) -> list[tuple[str, str]]:
     found = []
     for d in sorted(results.glob("*/*")):
-        if (d / "model_summary_deep_d_gt_5.parquet").exists() and (
-            d / "robustness.parquet"
-        ).exists():
-            found.append((d.parent.name, d.name))
+        if not (
+            (d / "model_summary_deep_d_gt_5.parquet").exists()
+            and (d / "robustness.parquet").exists()
+            and (d / "flow_balance.parquet").exists()
+        ):
+            continue
+        k = placebo_kappa(d)
+        if not PLACEBO_KAPPA[0] <= k <= PLACEBO_KAPPA[1]:
+            print(f"skip {d.parent.name} {d.name}: placebo added/cancelled = {k:.2f}")
+            continue
+        found.append((d.parent.name, d.name))
 
     def key(es: tuple[str, str]) -> tuple[int, int, str]:
         e, s = es

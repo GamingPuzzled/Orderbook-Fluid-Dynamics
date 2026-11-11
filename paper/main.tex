@@ -101,7 +101,7 @@ three phases:
         140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
         cancellations (ratio 1.09--1.12 against 1.03--1.04): genuinely new liquidity arrives.
 \end{enumerate}
-The structure is the same for both assets and robust to the definition of the deep book, the
+The structure is the same for BTC and ETH and robust to the definition of the deep book, the
 matching method, sweep size, sweep side and time of day, and a parametric three-phase model
 predicts the flows on held-out days better than exponential recovery or any model without
 repositioning or the source (Section~\ref{sec:param}). A queue-reactive benchmark, in which flows
@@ -156,6 +156,9 @@ streams on the exchange clock rather than on receipt time.
 
 \paragraph{Sample.} The main sample is 42 days (BTCUSDT) and 43 days (ETHUSDT) from May 2023 to
 October 2026 (BTCUSDT) and November 2026 (ETHUSDT). Table~\ref{tab:sample} summarises it.
+For replication (Section~\ref{sec:robust}) we add the Bybit SOLUSDT, XRPUSDT and LINKUSDT
+perpetuals on the same first-of-month days and with the same feed filter (31, 21 and 25 days
+with matched placebo times).
 
 \begin{table}[ht]
 \centering
@@ -678,7 +681,13 @@ falls from 0.17 with the near zone at 0.07\,bp to 0.04 at 0.7\,bp, and ETH repos
 0.09 at 0.2\,bp to 0.005 at 2\,bp: most moved liquidity travels less than 1--2\,bp. On
 XRP and LINK such moves stay inside the near zone, so the method cannot detect them there. On
 SOL it can, and repositioning is an order of magnitude smaller than on ETH at a comparable
-resolution (0.003 at 0.5\,bp against 0.07 at 0.4\,bp). The tick grid also explains why local
+resolution (0.003 at 0.5\,bp against 0.07 at 0.4\,bp). The link to the tick is cross-sectional. Within
+an asset, the relative tick varies with the price level (2--4 times for BTC and ETH across our
+days) and with exchange tick changes (SOL from 0.01 to 0.001). Regressing day-level
+repositioning on the log relative tick with asset fixed effects gives slopes of the expected
+sign but not significantly different from zero ($-0.039$ per tenfold increase, 95\% interval
+$[-0.100, 0.010]$, for all five assets; $-0.064$, $[-0.155, 0.019]$, for BTC and ETH), so
+within-asset variation neither confirms nor rejects a causal role of the tick. The tick grid also explains why local
 diffusion now helps (gain in out-of-sample $R^2$ of 0.14--0.23, against none for BTC and ETH):
 a displacement of a fraction of a basis point is a jump of tens of ticks on BTC but a step of
 one or two ticks on the large-tick books, where a local operator can capture it. Finally, the

@@ -308,6 +308,22 @@ def _cmd_zonewidth(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_ticksize(a: argparse.Namespace) -> int:
+    from lobflow.ticksize import run_ticksize
+
+    assets = [tuple(x.split(":", 1)) for x in a.assets.split(",")]
+    print(
+        run_ticksize(
+            Path(a.events),
+            Path(a.results),
+            [(e, s) for e, s in assets],
+            max_push_ms=a.max_push_ms,
+            n_boot=a.n_boot,
+        )
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="lobflow")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -474,6 +490,18 @@ def build_parser() -> argparse.ArgumentParser:
     zw.add_argument("--k", type=int, default=5, help="nearest placebo times per sweep")
     zw.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     zw.set_defaults(fn=_cmd_zonewidth)
+
+    ts = sub.add_parser("ticksize", help="within-asset regression of refill on relative tick")
+    ts.add_argument(
+        "--assets",
+        default="bybit:BTCUSDT,bybit:ETHUSDT,bybit:SOLUSDT,bybit:XRPUSDT,bybit:LINKUSDT",
+        help="comma-separated exchange:symbol pairs",
+    )
+    ts.add_argument("--events", default="data/events")
+    ts.add_argument("--results", default="results/pooled")
+    ts.add_argument("--n-boot", type=int, default=500)
+    ts.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
+    ts.set_defaults(fn=_cmd_ticksize)
     return ap
 
 

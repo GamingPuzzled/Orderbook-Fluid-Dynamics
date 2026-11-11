@@ -54,6 +54,7 @@ uv run lobflow execution  --exchange $EX --symbol $SYM          # follow-up orde
 uv run lobflow fitmodels  --exchange $EX --symbol $SYM          # parametric model comparison
 uv run lobflow information --exchange $EX --symbol $SYM         # refill by post-sweep drift
 uv run lobflow zonewidth --exchange $EX --symbol $SYM           # repositioning by near-zone width
+uv run lobflow ticksize                                          # within-asset tick regression (pooled)
 ```
 
 Bitstamp order-level replication (frozen sample used in the paper):
@@ -122,6 +123,7 @@ for BTC/USD), plus a REST snapshot at each connect and every 15 minutes.
 | `fitmodels.py` | Parametric refill models (incl. Hawkes responses) compared out of sample |
 | `queuereactive.py` | Queue-reactive benchmark (flows as a function of queue sizes only) |
 | `information.py` | Refill by post-sweep price drift (adverse-selection test) |
+| `ticksize.py` | Within-asset regression of refill on the relative tick size |
 | `l3.py` | Bitstamp order-level replay, sweeps, flows and move tests |
 | `cli.py` | `lobflow` command-line interface |
 
