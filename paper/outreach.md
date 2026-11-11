@@ -30,10 +30,16 @@ cancellations and fills, which gives a mass balance of the swept side.
    - **New liquidity** (~0.4–0.8 s): only then do additions exceed cancellations.
 2. **Model comparison.** Out of sample, a three-phase model (withdrawal + early move pulse with
    mean ~50 ms + delayed source) beats exponential recovery and every model without the move or
-   the source. A local diffusion term adds no predictive power for the depth profile.
-3. **Execution.** A follow-up market order pays 2–3× the normal cost 20 ms after a sweep, but
+   the source. A linear-Hawkes response fits as well and recovers the same two time scales
+   (~30–50 ms and ~0.6 s). A queue-reactive model, where flows depend only on the book's
+   current state, fails (out-of-sample R² 0.10–0.45): refill depends on time since the sweep.
+   A local diffusion term adds no predictive power for the depth profile.
+3. **Not driven by information.** The early phases are nearly the same whether the price later
+   continues in the sweep's direction or reverts: a generic reaction to the sweep itself, with
+   only a modest tilt towards protection after informative sweeps.
+4. **Execution.** A follow-up market order pays 2–3× the normal cost 20 ms after a sweep, but
    about 90% of that excess is gone within 250 ms, during repositioning.
-4. **Order-level check (preliminary).** On Bitstamp, about a quarter of near-touch liquidity is
+5. **Order-level check (preliminary).** On Bitstamp, about a quarter of near-touch liquidity is
    an existing order cancelled deep and re-posted near the touch with the identical amount, so
    "moving" liquidity is routine.
 
@@ -58,9 +64,10 @@ topic of theirs], I'd be grateful for your view on it.
 Using 20 ms order book data for Bitcoin and Ether perpetual futures (about 42,000 events), I
 find that refill happens in three phases: within the first ~100 ms market makers pull deep
 orders and move existing depth to the new price, and only after ~0.4–0.8 s does new liquidity
-arrive. A three-phase parametric model beats exponential recovery out of sample, there is no
-role for the diffusion term that continuum order book models assume, and the excess cost of a follow-up trade is mostly gone
-within 250 ms. A one-page summary and the main figure are attached; the code is public at
+arrive. A three-phase parametric model beats exponential recovery out of sample, a queue-reactive
+model based on the book's state alone fails, the early phases look the same whether or not the
+sweep turns out to be informative, there is no role for the diffusion term that continuum order
+book models assume, and the excess cost of a follow-up trade is mostly gone within 250 ms. A one-page summary and the main figure are attached; the code is public at
 https://github.com/GamingPuzzled/Orderbook-Fluid-Dynamics.
 
 I have a full draft. Would you have 20 minutes in the coming weeks to look at it, or would you

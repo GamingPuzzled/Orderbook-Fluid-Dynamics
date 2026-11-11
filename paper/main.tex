@@ -102,7 +102,11 @@ three phases:
 The structure is the same for both assets and robust to the definition of the deep book, the
 matching method, sweep size, sweep side and time of day, and a parametric three-phase model
 predicts the flows on held-out days better than exponential recovery or any model without
-repositioning or the source (Section~\ref{sec:param}). The
+repositioning or the source (Section~\ref{sec:param}). A queue-reactive benchmark, in which flows
+depend only on current queue sizes, fails out of sample, and the early phases are nearly the
+same whether or not the price later continues in the sweep's direction
+(Section~\ref{sec:info}): refill is a reaction to the sweep itself, timed from it, not a
+response to the book's state or to the sweep's information content. The
 best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
 
@@ -119,7 +123,10 @@ extend through the book and are followed by systematic repositioning before new 
 arrives. Relative to continuum models, our evidence favours non-local and source terms over a
 local diffusion term at sub-second horizons; fractional and non-local order-book models exist in
 theory and simulation \citep{benzaquen2018fractional,diana2024anomalous}, and we provide
-empirical support for that class. Finally, we show that the phases matter for execution (the
+empirical support for that class. Relative to queue-reactive and Hawkes models of order flow
+\citep{huang2015queue,bacry2015hawkes}, we show that post-sweep flows depend on time since the
+shock rather than on queue sizes, and that a linear-Hawkes response reproduces their two time
+scales. Finally, we show that the phases matter for execution (the
 excess cost of a follow-up order is mostly gone within 250\,ms, before new liquidity arrives),
 and we use a public order-level feed from a second venue to show that cancel-and-repost moves
 are a routine part of near-touch liquidity supply.
@@ -300,7 +307,24 @@ Hawkes-type response functions and two queue-reactive benchmarks to the excess
 curves $N(w)$ and $J(w)$ on the 20--1000\,ms windows. Each phase is a rate
 $r(t) = m\,\mathrm{Gamma}(t;k,\theta)$ in time since the sweep, where $k=1$ decays from the
 sweep and $k=2$ is a delayed hump peaking at $\theta$; withdrawal adds to $J$, repositioning to
-both $J$ and $N$ (it conserves depth), and new liquidity to $N$. Parameters are estimated by
+both $J$ and $N$ (it conserves depth), and new liquidity to $N$. The three-phase model (E), for
+example, is
+\begin{equation}
+\label{eq:threephase}
+\begin{aligned}
+\frac{dN}{dt} &= r_T(t) + r_S(t), \qquad \frac{dJ}{dt} = r_W(t) + r_T(t),\\
+r_W(t) &= \frac{m_W}{\theta_W}\,e^{-t/\theta_W}, \quad
+r_T(t) = m_T\,\frac{t}{\theta_T^{2}}\,e^{-t/\theta_T}, \quad
+r_S(t) = m_S\,\frac{t}{\theta_S^{2}}\,e^{-t/\theta_S},
+\end{aligned}
+\end{equation}
+so that excess swept-side depth changes at rate $r_S - r_W$: repositioning moves depth but
+does not change the total. Fitted values are $(m_W,\theta_W) = (0.34, 75\,\mathrm{ms})$,
+$(m_T,\theta_T) = (0.17, 23\,\mathrm{ms})$ and $(m_S,\theta_S) = (0.56, 390\,\mathrm{ms})$ for
+BTC, and $(0.58, 16\,\mathrm{ms})$, $(0.10, 24\,\mathrm{ms})$ and $(0.18, 276\,\mathrm{ms})$ for
+ETH, with masses in units of pre-sweep swept-side depth; ETH's withdrawal falls mostly inside
+the excluded first 20\,ms and is poorly pinned down (95\% interval for $m_W$: 0.37--1.01).
+Parameters are estimated by
 weighted least squares with day-bootstrap standard errors, from many starting points, and
 models are compared by five-fold cross-validation over days and by AIC
 (Table~\ref{tab:fitmodels}, Figure~\ref{fig:fitmodels}).
