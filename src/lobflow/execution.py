@@ -132,11 +132,15 @@ def run_execution(
     )
     q_med = float(base.median())  # type: ignore[arg-type]
     qs = [m * q_med for m in q_mults]
-    tick = {d: float(t) for d, t in ev.group_by("day").agg(pl.col("tick").first()).iter_rows()}
+    # tick size per day from all detected events (a matched placebo day may have no full sweep)
+    tick = {
+        d: float(t)
+        for d, t in data["events"].group_by("day").agg(pl.col("tick").first()).iter_rows()
+    }
 
     s_prof = data["moving"].filter(pl.col("event_id").is_in(ev["event_id"].implode()))
     p_prof = data["placebo"].join(w.select("event_id", "w"), on="event_id", how="inner")
-    p_prof = p_prof.filter(pl.col("w") > 0)
+    p_prof = p_prof.filter((pl.col("w") > 0) & pl.col("day").is_in(list(tick)))
     s = costs(profile_matrix(s_prof), tick, qs)
     p = costs(profile_matrix(p_prof), tick, qs).join(
         w.select("event_id", "w"), on="event_id", how="inner"
