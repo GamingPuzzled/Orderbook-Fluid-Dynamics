@@ -323,6 +323,21 @@ def zonewidth(res: Path, out: Path) -> None:
     (out / "zonewidth.tex").write_text(_rows_tex(head, rows, "l" + "c" * len(cuts)))
 
 
+def hazard(out: Path) -> None:
+    """Near-touch cancellation rate at placebo times (results/pooled/hazard.parquet)."""
+    f = Path("results/pooled/hazard.parquet")
+    if not f.exists():
+        return
+    venues = {"bybit": "Bybit", "binance-futures": "Binance"}
+    rows = [
+        f"{venues.get(r['exchange'], r['exchange'])} & {r['symbol']} & {r['days']} & "
+        f"{r['cancel_rate']:.2f} {{\\scriptsize[{r['lo']:.2f}, {r['hi']:.2f}]}} \\\\"
+        for r in pl.read_parquet(f).iter_rows(named=True)
+    ]
+    head = "Venue & Asset & Days & Cancelled per second \\\\"
+    (out / "hazard.tex").write_text(_rows_tex(head, rows, "llrc"))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets", default="BTCUSDT,ETHUSDT")
@@ -334,6 +349,7 @@ def main() -> None:
     for fn in (pde, sample, kappa, phases, fitmodels, information):
         fn(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
     zonewidth(Path("results") / a.exchange, Path(a.out))
+    hazard(Path(a.out))
     print(f"wrote {a.out}/: all tables")
 
 

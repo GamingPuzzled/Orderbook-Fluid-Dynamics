@@ -112,7 +112,10 @@ on the Binance BTC perpetual, but repositioning appears only on the small-tick b
 and ETH and Binance BTC. On BTC and ETH most moved liquidity travels less than 1--2\,bp, which
 on XRP and LINK lies inside the near zone; on SOL, where the grid is fine enough to see such
 moves, repositioning is an order of magnitude smaller; and on the large-tick books the excess
-execution cost decays far more slowly (Section~\ref{sec:robust}). The
+execution cost decays far more slowly (Section~\ref{sec:robust}). This fits a queue-priority
+explanation: where the tick is large, a place in the queue is valuable and re-posting gives it
+up, and near-touch orders on the large-tick books are cancelled two to five times more slowly
+even in normal times. The
 best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
 
@@ -697,8 +700,8 @@ fast recovery of execution cost, is therefore a feature of the deep, small-tick 
 books; withdrawal, early net depletion and a delayed source of new liquidity are common to
 all five.
 
-\paragraph{Another venue.} The Binance BTCUSDT perpetual has the same relative tick as Bybit
-BTCUSDT (0.016\,bp) but a different participant base, so it separates the tick from the
+\paragraph{Another venue.} The Binance BTCUSDT perpetual has nearly the same relative tick as
+Bybit BTCUSDT (0.017 against 0.014\,bp) but a different participant base, so it separates the tick from the
 venue. Its free Tardis feed publishes about 1{,}000 levels every 52\,ms; we replay the full
 book but classify changes only within the best 50 levels per side, as on Bybit (deep levels of
 the full-depth feed go stale, which otherwise appears as spurious additions; with the
@@ -706,12 +709,36 @@ restriction, added $\div$ cancelled at placebo times is 1.05). On four days so f
 sweeps; the 52\,ms push interval blurs the first two windows), the pattern is the BTC one.
 Additions fall short of cancellations at 20--40\,ms ($\kappa = 0.58$, interval
 $[0.13, 0.93]$) and exceed them at 250--1000\,ms (1.11, as on Bybit); withdrawal before
-250\,ms is 0.22 of pre-sweep depth, the same as on Bybit; repositioning is 0.063
-($[0.039, 0.079]$), about a third of Bybit's 0.17 but clearly positive, and supplies the whole
-near-touch rebuild before 250\,ms; and the follow-up execution excess falls to 16\% of its
-20\,ms value by 250\,ms (Bybit 13\%). Phase centroids are 99, 207 and 501\,ms. Fast
+250\,ms is 0.22 of pre-sweep depth, the same as on Bybit; repositioning is 0.075
+($[0.040, 0.116]$), less than half of Bybit's 0.17 but clearly positive, supplies the whole
+near-touch rebuild before 250\,ms, and, as on Bybit, almost vanishes once the near zone is
+widened to 50 ticks (0.006 at 0.9\,bp); and the follow-up execution excess falls to 13\% of
+its 20\,ms value by 250\,ms, as on Bybit. Phase centroids are 98, 238 and 503\,ms. Fast
 repositioning therefore appears on both small-tick BTC books, on two venues, and on none of
 the large-tick books.
+
+\paragraph{Why the tick matters.} On a book whose tick is large relative to price, queues at
+each price are long and an order's place in the queue is valuable: \citet{moallemi2016queue}
+estimate that queue position in large-tick stocks is worth about as much as the bid--ask
+spread, and \citet{yao2018speed} show that a larger relative tick lengthens queues and makes
+time priority valuable. Cancelling an order and re-posting it at the new price gives that
+priority up. On a small-tick book queues are short and priority is cheap, so moving an order
+toward the new price costs little. This predicts that resting near-touch depth turns over
+more slowly on large-tick books even in normal times, and it does (Table~\ref{tab:hazard}):
+at placebo times, near-touch depth is cancelled at 0.20--0.33 of its size per second on SOL,
+XRP and LINK, against 0.66--1.14 on the three small-tick books. The comparison is across
+assets, which also differ in depth and participants, and within-asset variation in the
+relative tick does not identify the effect, so this is evidence consistent with the
+queue-priority explanation rather than a test that isolates it.
+
+\begin{table}[ht]
+\centering
+\caption{Near-touch turnover in normal times. Swept-side cancelled volume within five ticks of
+the opposite best quote over the first second after placebo times, divided by the resting
+depth there just before (per second). 95\% day-bootstrap intervals.}
+\label{tab:hazard}
+\input{tables/hazard.tex}
+\end{table}
 
 \begin{table}[ht]
 \centering
