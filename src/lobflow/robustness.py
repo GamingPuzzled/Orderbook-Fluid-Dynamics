@@ -22,6 +22,7 @@ import polars as pl
 
 from lobflow.model import (
     DEEP,
+    NEAR,
     day_window_sums,
     excess_masses,
     observed_summary,
@@ -133,12 +134,15 @@ def subset_point_fn(
     p_info: pl.DataFrame,
     w: pl.DataFrame,
     windows: Sequence[str],
+    *,
+    near_zones: Sequence[str] = NEAR,
+    deep_zones: Sequence[str] = DEEP,
 ) -> tuple[Callable[[Sequence[str]], dict[str, float]], list[str]]:
     """(statistics for a list of days (repeats allowed), the subset's usable days)."""
     days = sorted(set(s_info["day"].unique()) & set(p_info.join(w, on="event_id")["day"]))
     s_info = s_info.filter(pl.col("day").is_in(days))
-    s_sums = day_window_sums(s_flows, s_info, None, DEEP)
-    p_sums = day_window_sums(p_flows, p_info, w, DEEP)
+    s_sums = day_window_sums(s_flows, s_info, None, deep_zones, near_zones)
+    p_sums = day_window_sums(p_flows, p_info, w, deep_zones, near_zones)
     k_sums = kappa_day_sums(s_flows, s_info)
     edges = window_edges(windows)
 
@@ -170,9 +174,13 @@ def subset_stats(
     *,
     n_boot: int = 100,
     seed: int = 0,
+    near_zones: Sequence[str] = NEAR,
+    deep_zones: Sequence[str] = DEEP,
 ) -> dict[str, float]:
     """Point estimates and bootstrap CIs (``<stat>_lo``/``_hi``) for one subset."""
-    one, days = subset_point_fn(s_flows, s_info, p_flows, p_info, w, windows)
+    one, days = subset_point_fn(
+        s_flows, s_info, p_flows, p_info, w, windows, near_zones=near_zones, deep_zones=deep_zones
+    )
     point = one(days)
     rng = np.random.default_rng(seed)
     boots = [one(rng.choice(days, size=len(days)).tolist()) for _ in range(n_boot)]
@@ -345,4 +353,60 @@ def run_robustness(
         )
     text = "\n".join(lines) + "\n"
     (results_dir / "robustness.md").write_text(text)
+    return text
+
+
+ZONES = ("1-5", "6-10", "11-20", "21-50", "51+")
+ZONE_CUTS = (5, 10, 20, 50)  # near zone = d <= cut ticks
+
+
+def run_zonewidth(
+    out_dir: Path,
+    results_dir: Path,
+    *,
+    tag: str = "flowsfine",
+    n_boot: int = 100,
+    k: int = 5,
+    max_push_ms: float = 20.0,
+) -> str:
+    """Three-component split with wider near zones (d <= 5, 10, 20, 50 ticks), to show at what
+    price distance repositioning happens; writes ``zonewidth.md`` and ``zonewidth.parquet``.
+
+    Repositioning is identified only between zones, so a move that stays inside the near zone
+    is invisible. If the repositioning mass falls as the near zone widens, liquidity is moved
+    over short distances; comparing the cut in basis points across assets separates price
+    distance from the tick grid."""
+    si = prepare_subsets(out_dir, tag=tag, max_push_ms=max_push_ms)
+    w = match_within_day(si.s_cov, si.p_cov, method="nn", k=k)
+    tick_bp = float((si.events["tick"] / si.events["mid_pre"] * 1e4).median())  # type: ignore[arg-type]
+    rows: list[dict[str, object]] = []
+    for i, cut in enumerate(ZONE_CUTS):
+        st = subset_stats(
+            si.s_flows, si.s_info, si.p_flows, si.p_info, w, si.windows, n_boot=n_boot,
+            near_zones=ZONES[: i + 1], deep_zones=ZONES[i + 1 :],
+        )  # fmt: skip
+        rows.append({"near_max_ticks": cut, "near_max_bp": cut * tick_bp, **st})
+    results_dir.mkdir(parents=True, exist_ok=True)
+    table = pl.DataFrame(rows)
+    table.write_parquet(results_dir / "zonewidth.parquet")
+    shown = ("withdrawal_<250ms", "transport_<250ms", "source_>250ms", "transport_share_<250ms")
+    lines = [
+        "# Repositioning distance: three-component split by near-zone width",
+        "",
+        f"Median tick: {tick_bp:.3f} bp of the mid. Near zone d <= cut ticks, deep zone the rest."
+        " NN placebo, 95% day-cluster bootstrap CIs; masses are fractions of pre-shock "
+        "swept-side depth.",
+        "",
+        "| near zone (ticks) | near zone (bp) | withdrawal <250 | repositioning <250 | "
+        "new liq. >250 | repos. share <250 |",
+        "|---|---|---|---|---|---|",
+    ]
+    for r in table.iter_rows(named=True):
+        lines.append(
+            f"| <= {r['near_max_ticks']} | {r['near_max_bp']:.2f} | "
+            + " | ".join(_fmt(r, s, 3) for s in shown)
+            + " |"
+        )
+    text = "\n".join(lines) + "\n"
+    (results_dir / "zonewidth.md").write_text(text)
     return text

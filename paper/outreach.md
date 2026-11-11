@@ -37,14 +37,19 @@ cancellations and fills, which gives a mass balance of the swept side.
 3. **Not driven by information.** The early phases are nearly the same whether the price later
    continues in the sweep's direction or reverts: a generic reaction to the sweep itself, with
    only a modest tilt towards protection after informative sweeps.
-4. **Execution.** A follow-up market order pays 2–3× the normal cost 20 ms after a sweep, but
+4. **Other assets.** On SOL, XRP and LINK (thinner books, ticks 7–40× larger relative to
+   price) withdrawal, early net depletion and delayed new liquidity replicate, but the fast
+   move does not: on BTC/ETH most moved liquidity travels < 1–2 bp, below the alts' tick grid,
+   and on SOL, where it would be visible, it is 20× smaller. Execution costs there recover
+   far more slowly.
+5. **Execution.** A follow-up market order pays 2–3× the normal cost 20 ms after a sweep, but
    about 90% of that excess is gone within 250 ms, during repositioning.
-5. **Order-level check (preliminary).** On Bitstamp, about a quarter of near-touch liquidity is
+6. **Order-level check (preliminary).** On Bitstamp, about a quarter of near-touch liquidity is
    an existing order cancelled deep and re-posted near the touch with the identical amount, so
    "moving" liquidity is routine.
 
 **Status.** Full pipeline (Python, tested, public on GitHub); draft paper written; replications
-on SOL, XRP, LINK, Binance and OKX are being processed; Bitstamp order-level recording ongoing.
+on SOL, XRP and LINK done (Bybit); Binance and OKX being processed; Bitstamp order-level recording ongoing.
 
 **What I'm looking for.** A faculty mentor or co-author to review the framing and help prepare
 the paper for submission (target: *Quantitative Finance*).

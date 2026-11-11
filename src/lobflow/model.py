@@ -74,6 +74,7 @@ def day_window_sums(
     info: pl.DataFrame,
     w: pl.DataFrame | None,
     deep_zones: Sequence[str] = DEEP,
+    near_zones: Sequence[str] = NEAR,
 ) -> pl.DataFrame:
     """Per day × window: near net build-up and deep net depletion (sums), and pre depth.
 
@@ -96,7 +97,7 @@ def day_window_sums(
         )
     )
     near = (
-        f.filter(pl.col("zone").is_in(list(NEAR)))
+        f.filter(pl.col("zone").is_in(list(near_zones)))
         .group_by("day", "window")
         .agg(pl.col("net_add").sum().alias("near"))
     )

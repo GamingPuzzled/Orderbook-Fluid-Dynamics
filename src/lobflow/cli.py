@@ -299,6 +299,15 @@ def _cmd_robustness(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_zonewidth(a: argparse.Namespace) -> int:
+    from lobflow.robustness import run_zonewidth
+
+    out = Path(a.events) / a.exchange / a.symbol
+    res = Path(a.results) / a.exchange / a.symbol
+    print(run_zonewidth(out, res, tag=a.tag, n_boot=a.n_boot, k=a.k, max_push_ms=a.max_push_ms))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="lobflow")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -454,6 +463,17 @@ def build_parser() -> argparse.ArgumentParser:
     ro.add_argument("--k", type=int, default=5, help="nearest placebo times per sweep")
     ro.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
     ro.set_defaults(fn=_cmd_robustness)
+
+    zw = sub.add_parser("zonewidth", help="repositioning by near-zone width (move distance)")
+    zw.add_argument("--exchange", required=True)
+    zw.add_argument("--symbol", required=True)
+    zw.add_argument("--events", default="data/events")
+    zw.add_argument("--results", default="results")
+    zw.add_argument("--tag", default="flowsfine")
+    zw.add_argument("--n-boot", type=int, default=100)
+    zw.add_argument("--k", type=int, default=5, help="nearest placebo times per sweep")
+    zw.add_argument("--max-push-ms", type=float, default=20.0, help="main-sample feed filter")
+    zw.set_defaults(fn=_cmd_zonewidth)
     return ap
 
 

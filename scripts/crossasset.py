@@ -3,8 +3,10 @@
 Discovers every results/<exchange>/<symbol>/ that has the model and robustness outputs and
 writes, for all of them at once:
 
-- paper/tables/crossasset.tex : days, sweeps, κ(20–40), repositioning share (<250 ms), phase
-  centroids, switch time, PDE R² gain from diffusion, execution excess left at 250 ms;
+- paper/tables/crossasset.tex : days, sweeps, relative tick size (bp), κ(20–40), repositioning
+  share (<250 ms), phase centroids, switch time, PDE R² gain from diffusion, execution excess
+  left at 250 ms ("cens." when more than 20% of follow-up walks still exhaust the 50-tick
+  profile at 250 ms);
 - figures/fig4_cross_asset.{png,pdf} (+ paper/figures copy): forest plot of κ(20–40) and the
   repositioning share, and the three phase centroids per asset.
 
@@ -32,6 +34,7 @@ from figures import AQUA, BLUE, ORANGE, TEXT_2, _save, _style  # noqa: E402
 
 VENUES = {"bybit": "Bybit", "binance-futures": "Binance", "okex-swap": "OKX"}
 MAIN_ORDER = ("BTC", "ETH", "SOL", "XRP", "LINK")
+MAX_SHORT = 0.2  # execution excess is censored if more walks than this run out of depth
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,8 @@ class Row:
     n_sweeps: int
     pde_gain: float | None
     exec_left: float | None
+    exec_censored: bool
+    tick_bp: float | None
 
 
 def discover(results: Path) -> list[tuple[str, str]]:
@@ -61,6 +66,15 @@ def discover(results: Path) -> list[tuple[str, str]]:
     return sorted(found, key=key)
 
 
+def tick_bp(d: Path) -> float | None:
+    """Median tick relative to the pre-sweep mid (bp), over the analysed sweeps (zonewidth)."""
+    f = d / "zonewidth.parquet"
+    if not f.exists():
+        return None
+    r = pl.read_parquet(f).row(0, named=True)
+    return float(r["near_max_bp"] / r["near_max_ticks"])
+
+
 def load_row(results: Path, exchange: str, symbol: str) -> Row:
     d = results / exchange / symbol
     ms = pl.read_parquet(d / "model_summary_deep_d_gt_5.parquet")
@@ -76,13 +90,17 @@ def load_row(results: Path, exchange: str, symbol: str) -> Row:
         r2 = oos.group_by("model").agg((1 - pl.col("sse").sum() / pl.col("ss0").sum()).alias("r2"))
         get = {m: v for m, v in r2.iter_rows()}
         pde_gain = get["local"] - get["common"]
-    exec_left = None
+    exec_left, exec_censored = None, False
     if (d / "execution.parquet").exists():
         ex = pl.read_parquet(d / "execution.parquet").filter(
             (pl.col("q_mult") == 0.1) & (pl.col("stat") == "cost_bps")
         )
         e20 = ex.filter(pl.col("tau_ms") == 20)["diff"]
         e250 = ex.filter(pl.col("tau_ms") == 250)["diff"]
+        short = pl.read_parquet(d / "execution.parquet").filter(
+            (pl.col("q_mult") == 0.1) & (pl.col("stat") == "short") & (pl.col("tau_ms") == 250)
+        )["sweep"]
+        exec_censored = bool(len(short) and short[0] > MAX_SHORT)
         if len(e20) and len(e250) and e20[0] > 0:
             exec_left = float(e250[0] / e20[0])
     return Row(
@@ -93,6 +111,8 @@ def load_row(results: Path, exchange: str, symbol: str) -> Row:
         int(r["n_sweeps"]),
         pde_gain,
         exec_left,
+        exec_censored,
+        tick_bp(d),
     )
 
 
@@ -111,13 +131,23 @@ def _switch(v: tuple[float, float, float]) -> str:
     return f"{lo:.0f}--{hi:.0f}"
 
 
+def _ms(v: float) -> str:
+    return "--" if np.isnan(v) else f"{v:.0f}"
+
+
+def _exec(r: Row) -> str:
+    if r.exec_censored:
+        return "cens."
+    return "--" if r.exec_left is None else f"{r.exec_left:.2f}"
+
+
 def table(rows: list[Row], out: Path) -> None:
     head = (
-        "Venue & Asset & Days & Sweeps & $\\kappa_{20\\text{--}40}$ & Repos.\\ share & "
+        "Venue & Asset & Days & Sweeps & Tick (bp) & $\\kappa_{20\\text{--}40}$ & Repos.\\ share & "
         "$\\bar t_{\\mathrm{W}}$ & $\\bar t_{\\mathrm{R}}$ & $\\bar t_{\\mathrm{S}}$ & "
         "Switch & $\\Delta R^2_{\\mathrm{diff}}$ & Exec.\\ left \\\\"
     )
-    lines = ["\\begin{tabular}{llrrcccccccc}", "\\toprule", head, "\\midrule"]
+    lines = ["\\begin{tabular}{llrrrcccccccc}", "\\toprule", head, "\\midrule"]
     for r in rows:
         s = r.stats
         cells = [
@@ -125,14 +155,15 @@ def table(rows: list[Row], out: Path) -> None:
             r.symbol,
             str(r.n_days),
             f"{r.n_sweeps:,}".replace(",", "{,}"),
+            "--" if r.tick_bp is None else f"{r.tick_bp:.3f}",
             _ci(s["kappa_20-40"], 2),
             _ci(s["transport_share_<250ms"], 2),
-            f"{s['withdrawal_centroid_ms'][0]:.0f}",
-            f"{s['transport_centroid_ms'][0]:.0f}",
-            f"{s['source_centroid_ms'][0]:.0f}",
+            _ms(s["withdrawal_centroid_ms"][0]),
+            _ms(s["transport_centroid_ms"][0]),
+            _ms(s["source_centroid_ms"][0]),
             _switch(s["t_switch_ms"]),
             "--" if r.pde_gain is None else f"{r.pde_gain:+.3f}",
-            "--" if r.exec_left is None else f"{r.exec_left:.2f}",
+            _exec(r),
         ]
         lines.append(" & ".join(cells) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabular}"]

@@ -53,6 +53,7 @@ uv run lobflow pde        --exchange $EX --symbol $SYM          # local vs non-l
 uv run lobflow execution  --exchange $EX --symbol $SYM          # follow-up order cost
 uv run lobflow fitmodels  --exchange $EX --symbol $SYM          # parametric model comparison
 uv run lobflow information --exchange $EX --symbol $SYM         # refill by post-sweep drift
+uv run lobflow zonewidth --exchange $EX --symbol $SYM           # repositioning by near-zone width
 ```
 
 Bitstamp order-level replication (frozen sample used in the paper):
@@ -82,6 +83,7 @@ uv run python scripts/crossasset.py   # Table: cross-asset summary; Figure 4 (al
 | Robustness table | `robustness.parquet` | `robustness` → `tables.py` |
 | Model comparison table, Fig. 6 | `fitmodels_*.parquet` | `fitmodels` → `tables.py`, `figures.py` |
 | Informative vs uninformative sweeps table | `information_diff.parquet` | `information` → `tables.py` |
+| Repositioning distance table | `zonewidth.parquet` | `zonewidth` → `tables.py` |
 | Cross-asset table / Fig. 4 | all of the above | `crossasset.py` |
 
 Every table in the paper is generated from these files (none is typed by hand). Bootstrap seeds are fixed, so reruns on the same days reproduce the numbers exactly.

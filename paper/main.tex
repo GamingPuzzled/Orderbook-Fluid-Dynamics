@@ -37,7 +37,9 @@ placebo); and (iii) a delayed \emph{source} of genuinely new liquidity, centred 
 recovery and every model that omits repositioning or the source; a queue-reactive benchmark,
 in which flows depend only on the current state of the book, fails, so time since the sweep
 matters beyond the book's state; and a local diffusion term adds no predictive power for the
-depth profile.
+depth profile. On three thinner, large-tick books (SOLUSDT, XRPUSDT, LINKUSDT), withdrawal,
+early net depletion and the delayed source replicate, but repositioning, which on BTC and ETH
+moves liquidity by less than 1--2 basis points, is absent or finer than the tick grid.
 The excess cost of a follow-up market order falls by about 90\% within 250\,ms, during
 repositioning, while total depth is still below normal. The results suggest a reaction--diffusion description of the book in which a non-local jump kernel,
 a state-dependent cancellation rate and a delayed source replace the diffusion term.
@@ -106,7 +108,13 @@ repositioning or the source (Section~\ref{sec:param}). A queue-reactive benchmar
 depend only on current queue sizes, fails out of sample, and the early phases are nearly the
 same whether or not the price later continues in the sweep's direction
 (Section~\ref{sec:info}): refill is a reaction to the sweep itself, timed from it, not a
-response to the book's state or to the sweep's information content. The
+response to the book's state or to the sweep's information content. On three thinner Bybit
+books with large ticks (SOL, XRP, LINK), withdrawal, early net depletion and the delayed source
+replicate, but repositioning does not. On BTC and ETH most moved liquidity travels less than
+1--2\,bp, which on XRP and LINK lies inside the near zone; on SOL, where the grid is fine
+enough to see such moves, repositioning is an order of magnitude smaller, and on the
+large-tick books the excess execution cost decays far more slowly
+(Section~\ref{sec:robust}). The
 best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
 
@@ -121,7 +129,8 @@ depth-conserving repositioning and net new liquidity, and we time each phase at 
 resolution. Relative to the quote-fade evidence of \citet{MalinovaPark2016}, we show that fades
 extend through the book and are followed by systematic repositioning before new liquidity
 arrives. Relative to continuum models, our evidence favours non-local and source terms over a
-local diffusion term at sub-second horizons; fractional and non-local order-book models exist in
+local diffusion term at sub-second horizons on small-tick books, and shows that whether a
+displacement looks local depends on the tick grid; fractional and non-local order-book models exist in
 theory and simulation \citep{benzaquen2018fractional,diana2024anomalous}, and we provide
 empirical support for that class. Relative to queue-reactive and Hawkes models of order flow
 \citep{huang2015queue,bacry2015hawkes}, we show that post-sweep flows depend on time since the
@@ -541,8 +550,10 @@ positive only between 40 and 100\,ms (BTC $\gamma=0.09$ at 40--60\,ms; ETH 0.07 
 the common model for ETH (0.410 vs 0.389) but not for BTC. Profile snapshots alone identify the
 non-local jump only weakly, because a jump and a near-touch source both add mass at the touch;
 separating them requires the flow decomposition of Section~\ref{sec:results}. The two kinds of
-evidence agree: there is no local diffusion component at these horizons, and the near-touch
-rebuild comes from non-local reallocation and a source.
+evidence agree: for BTC and ETH there is no local diffusion component at these horizons, and
+the near-touch rebuild comes from non-local reallocation and a source. On the large-tick books
+of Section~\ref{sec:robust} a local term does help, because the same short displacement spans
+only one or two ticks there.
 
 %----------------------------------------------------------------------------------------------
 \section{Related literature}
@@ -573,7 +584,8 @@ as a stochastic PDE around the mid price and calibrate it to the average profile
 \citet{hambly2024porous} study a stochastic porous-medium equation motivated by the order book.
 \citet{mahseredjian2025migration} derives a diffusion limit of a Hawkes-driven book in which
 liquidity migrates between neighbouring price levels, so that the limit contains a local
-diffusion term; our out-of-sample fits find no role for such a term after sweeps.
+diffusion term; our out-of-sample fits find no role for such a term after sweeps on the
+small-tick BTC and ETH books, but do on large-tick books.
 To our knowledge these models have not been confronted with the conditional, post-shock
 dynamics of the depth profile. Our evidence supports their non-local variants over local
 diffusion at the horizons we study.
@@ -642,7 +654,49 @@ Table~\ref{tab:cross} and Figure~\ref{fig:cross} collect the headline statistics
 asset and venue in the sample: early net depletion ($\kappa_{20\text{--}40}<1$), the
 repositioning share, the three phase centroids, the switch to net new liquidity, the gain in
 out-of-sample $R^2$ from adding local diffusion, and the share of the follow-up execution
-excess left at 250\,ms. \todo{Describe the additional coins and venues once processed.}
+excess left at 250\,ms.
+
+\paragraph{Other assets.} We repeat the full pipeline on the Bybit SOLUSDT, XRPUSDT and
+LINKUSDT perpetuals over the same first-of-month days (4{,}084, 1{,}060 and 768 sweeps). These
+books are thinner, and their tick is large relative to price: a median of 0.10, 0.47 and
+0.59\,bp of the mid, against 0.014\,bp for BTC and 0.040\,bp for ETH. Two of the three phases
+replicate. Additions fall short of cancellations at 20--40\,ms ($\kappa = 0.47$, 0.46 and
+0.58, all intervals below 1) and exceed them later ($\kappa_{250\text{--}1000} =
+1.10$--$1.18$); withdrawal before 250\,ms is 0.09--0.14 of pre-sweep depth; and the switch to
+net new liquidity comes at 60--100\,ms, with the source centred at 0.3--0.4\,s. Repositioning
+does not replicate as measured: the excess mass moved from $d>5$ to $d\le5$ before 250\,ms is
+0.000--0.007, against 0.17 (BTC) and 0.09 (ETH). Consistently, the three-phase model E fits
+no better than two exponentials (model B) on these assets (out-of-sample $R^2$ 0.60--0.71 for
+both), the linear-Hawkes response again fits best (0.83--0.88), and the queue-reactive
+benchmark again fails ($R^2 \le 0.32$). The early phases are again nearly the same for
+informative and uninformative sweeps.
+
+Repositioning is identified only between zones, so its absence could reflect the tick grid:
+on XRP and LINK the five-tick near zone already spans 2.4--3.0\,bp. Widening the near zone
+on BTC and ETH shows how far liquidity is moved (Table~\ref{tab:zonewidth}). BTC repositioning
+falls from 0.17 with the near zone at 0.07\,bp to 0.04 at 0.7\,bp, and ETH repositioning from
+0.09 at 0.2\,bp to 0.005 at 2\,bp: most moved liquidity travels less than 1--2\,bp. On
+XRP and LINK such moves stay inside the near zone, so the method cannot detect them there. On
+SOL it can, and repositioning is an order of magnitude smaller than on ETH at a comparable
+resolution (0.003 at 0.5\,bp against 0.07 at 0.4\,bp). The tick grid also explains why local
+diffusion now helps (gain in out-of-sample $R^2$ of 0.14--0.23, against none for BTC and ETH):
+a displacement of a fraction of a basis point is a jump of tens of ticks on BTC but a step of
+one or two ticks on the large-tick books, where a local operator can capture it. Finally, the
+follow-up execution excess decays much more slowly: 62\% (XRP) and 91\% (LINK) of it remains
+at 250\,ms, against 5--13\% on BTC and ETH (for SOL, follow-up orders of this size often
+exhaust the measured profile, so the cost is censored). Fast repositioning, and with it the
+fast recovery of execution cost, is therefore a feature of the deep, small-tick BTC and ETH
+books; withdrawal, early net depletion and a delayed source of new liquidity are common to
+all five.
+
+\begin{table}[ht]
+\centering
+\caption{Repositioning distance. Excess repositioning before 250\,ms (fraction of pre-sweep
+swept-side depth) when the near zone is $d \le 5$, 10, 20 or 50 ticks from the opposite best
+quote, with the cut in basis points of the mid. NN placebo; 95\% day-cluster intervals.}
+\label{tab:zonewidth}
+\resizebox{\textwidth}{!}{\input{tables/zonewidth.tex}}
+\end{table}
 
 \begin{table}[ht]
 \centering
@@ -678,17 +732,21 @@ share, and the timing of the three phases (95\% day-cluster intervals).}
   \item \textbf{Fill matching.} About one third of sweep volume exceeds the displayed size at
         its price (hidden or newly posted liquidity); matchable volume is capped at displayed
         size so it cannot absorb later cancellations.
-  \item \textbf{Venue and assets.} One venue, two assets. \todo{SOLUSDT, XRPUSDT, LINKUSDT
-        (Bybit) and Binance BTCUSDT futures.}
+  \item \textbf{Venue and assets.} One derivatives venue. The full three-phase structure
+        holds for its two deepest books; on three thinner, large-tick books repositioning is
+        either absent (SOL) or finer than the tick grid can resolve (XRP, LINK). \todo{Binance
+        and OKX BTC perpetuals.}
 \end{itemize}
 
 %----------------------------------------------------------------------------------------------
 \section{Conclusion}
-After a multi-level sweep, the crypto perpetual order book refills in three phases: within the
-first $\sim$100\,ms liquidity is pulled and moved to the new price, and only after
-0.4--0.8\,s is it made anew. The sequencing
+After a multi-level sweep, the deep Bitcoin and Ether perpetual order books refill in three
+phases: within the first $\sim$100\,ms liquidity is pulled and moved to the new price, and
+only after 0.4--0.8\,s is it made anew. On thinner books with large ticks, liquidity is
+still pulled first and made anew later, but the fast move to the new price is absent or
+finer than one tick, and the cost of trading again stays high for longer. The sequencing
 is invisible in aggregate resilience measures and in best-quote studies, and it is inconsistent
-with diffusion-type continuum models at sub-second horizons. For execution, the excess cost
+with diffusion-type continuum models at sub-second horizons on small-tick books. For execution, the excess cost
 of a follow-up order falls by about 90\% within 250\,ms, during repositioning, while total
 depth is still below normal. The early phases look nearly the same whether or not the price
 later continues in the sweep's direction, so they are a reaction to the sweep itself rather

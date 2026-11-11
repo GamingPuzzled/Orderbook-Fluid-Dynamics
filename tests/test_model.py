@@ -31,3 +31,27 @@ def test_split_components() -> None:
     np.testing.assert_allclose(t, [0.05, 0.03, 0.0])
     np.testing.assert_allclose(w, [0.09, 0.0, 0.0])
     np.testing.assert_allclose(s, [0.0, 0.0, 0.04])
+
+
+def test_day_window_sums_zone_cut() -> None:
+    """Widening the near zone moves a zone's net flow from deep depletion to near build-up."""
+    import polars as pl
+
+    from lobflow.model import day_window_sums
+
+    flows = pl.DataFrame(
+        {
+            "event_id": [0, 0, 0],
+            "window": ["0-20"] * 3,
+            "side": ["swept"] * 3,
+            "zone": ["1-5", "6-10", "51+"],
+            "metric": ["add", "cancel", "cancel"],
+            "value": [2.0, 1.0, 4.0],
+            "day": ["d"] * 3,
+        }
+    )
+    info = pl.DataFrame({"event_id": [0], "valid": [True], "depth_pre_swept": [10.0], "day": ["d"]})
+    narrow = day_window_sums(flows, info, None)
+    wide = day_window_sums(flows, info, None, ("51+",), ("1-5", "6-10"))
+    assert narrow.select("near", "deep").row(0) == (2.0, 5.0)
+    assert wide.select("near", "deep").row(0) == (1.0, 4.0)

@@ -299,6 +299,30 @@ def information(res: Path, assets: list[str], out: Path) -> None:
     (out / "information.tex").write_text(_rows_tex(head, rows, "l" + "c" * (2 * len(assets))))
 
 
+ZONE_ORDER = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "LINKUSDT")
+
+
+def zonewidth(res: Path, out: Path) -> None:
+    """Repositioning (<250 ms) by near-zone width, every asset with ``zonewidth.parquet``."""
+    found = [a for a in ZONE_ORDER if (res / a / "zonewidth.parquet").exists()]
+    if not found:
+        return
+    tabs = {a: pl.read_parquet(res / a / "zonewidth.parquet").sort("near_max_ticks") for a in found}
+    cuts = tabs[found[0]]["near_max_ticks"].to_list()
+    rows = []
+    for a in found:
+        cells = [a]
+        for r in tabs[a].iter_rows(named=True):
+            v, lo, hi = (r[f"transport_<250ms{x}"] for x in ("", "_lo", "_hi"))
+            cells.append(
+                f"{v:.3f} {{\\scriptsize[{lo:.3f}, {hi:.3f}]}} "
+                f"{{\\scriptsize({r['near_max_bp']:.2f}\\,bp)}}"
+            )
+        rows.append(" & ".join(cells) + " \\\\")
+    head = "Asset & " + " & ".join(f"$d \\le {c}$" for c in cuts) + " \\\\"
+    (out / "zonewidth.tex").write_text(_rows_tex(head, rows, "l" + "c" * len(cuts)))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets", default="BTCUSDT,ETHUSDT")
@@ -309,6 +333,7 @@ def main() -> None:
     execution(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
     for fn in (pde, sample, kappa, phases, fitmodels, information):
         fn(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
+    zonewidth(Path("results") / a.exchange, Path(a.out))
     print(f"wrote {a.out}/: all tables")
 
 
