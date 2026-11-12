@@ -44,9 +44,11 @@ case "$PHASE" in
     D=2023-11-01,2024-02-01,2024-05-01,2024-08-01,2024-11-01,2025-02-01,2025-05-01,2025-08-01,2025-11-01,2026-02-01,2026-05-01,2026-08-01
     $UV run lobflow batch --exchange okex-swap --symbol BTC-USDT-SWAP --start 2023-11-01 \
       --end 2026-08-01 --days $D --prune-raw --workers 1 >> "$LOG" 2>&1
-    $UV run lobflow analyze --exchange okex-swap --symbol BTC-USDT-SWAP > /dev/null 2>> "$LOG"
+    # OKX books channel pushes every 100 ms: relax the feed filter as for Binance (52 ms -> 60)
+    $UV run lobflow analyze --exchange okex-swap --symbol BTC-USDT-SWAP --max-push-ms 110 \
+      > /dev/null 2>> "$LOG"
     echo "okx exit $?" >> "$LOG"
-    post okex-swap BTC-USDT-SWAP 20
+    post okex-swap BTC-USDT-SWAP 110
     ;;
   binance)
     D=2023-11-01,2024-02-01,2024-05-01,2024-08-01,2024-11-01,2025-02-01,2025-05-01,2025-08-01,2025-11-01,2026-02-01,2026-05-01,2026-08-01
