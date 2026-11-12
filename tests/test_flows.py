@@ -182,3 +182,31 @@ def test_full_depth_feed_is_seen_through_top_n_window() -> None:
     assert _get(flows, metric="cancel", side="swept") == pytest.approx(1.0)
     assert _get(flows, metric="edge_in", side="swept") == pytest.approx(1.0)  # level 5 enters
     assert info["depth_pre_swept"][0] == pytest.approx(4.0)  # top-4 view
+
+
+def test_coarsen_nets_changes_within_bucket() -> None:
+    """With 50 ms buckets, a cancel and re-add at one price inside a bucket net to zero and the
+    bucket is published at its end; at full resolution both changes are seen."""
+    rows = [(0, True, True, 100.0, 5.0)]
+    rows += [(0, True, False, 100.5 + 0.5 * k, 1.0) for k in range(4)]
+    t0 = 1_000_000
+    rows += [(t0 + 5_000, False, False, 101.5, 0.0), (t0 + 15_000, False, False, 101.5, 1.0)]
+    rows += [(t0 + 20_000, False, False, 101.0, 1.6)]  # +0.6, same bucket [1.0 s, 1.05 s)
+    empty = np.array([], dtype=np.int64)
+    args = (
+        _arrays(rows),
+        empty,
+        np.array([]),
+        np.array([]),
+        np.array([], dtype=bool),
+        np.array([t0], dtype=np.int64),
+        np.array([True]),
+        TICK,
+    )
+    fine, _ = flow_panel(*args, edges_ms=(0, 40, 100), n_levels=4)
+    coarse, _ = flow_panel(*args, edges_ms=(0, 40, 100), n_levels=4, coarsen_us=50_000)
+    assert _get(fine, metric="cancel", side="swept") == pytest.approx(1.0)
+    assert _get(fine, metric="add", side="swept") == pytest.approx(1.6)
+    assert _get(coarse, metric="cancel", side="swept") == pytest.approx(0.0)
+    assert _get(coarse, metric="add", side="swept") == pytest.approx(0.6)
+    assert _get(coarse, metric="add", side="swept", window="40-100") == pytest.approx(0.6)

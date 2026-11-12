@@ -338,6 +338,34 @@ def hazard(out: Path) -> None:
     (out / "hazard.tex").write_text(_rows_tex(head, rows, "llrc"))
 
 
+def feedspeed(out: Path) -> None:
+    """Repositioning by levels cleared and feed speed (results/pooled/feedspeed.parquet)."""
+    f = Path("results/pooled/feedspeed.parquet")
+    if not f.exists():
+        return
+    tab = pl.read_parquet(f)
+    groups = tab["levels_cleared"].unique(maintain_order=True).to_list()
+    rows = []
+    for name in tab["set"].unique(maintain_order=True).to_list():
+        cells = [name]
+        for g in groups:
+            r = tab.filter((pl.col("set") == name) & (pl.col("levels_cleared") == g)).row(
+                0, named=True
+            )
+            v, lo, hi = (r[f"transport_<250ms{x}"] for x in ("", "_lo", "_hi"))
+            cells.append(f"{v:.3f} {{\\scriptsize[{lo:.3f}, {hi:.3f}]}}")
+        rows.append(" & ".join(cells) + " \\\\")
+
+    def label(g: str) -> str:
+        if g == "all":
+            return "All sweeps"
+        lo, hi = g.split("-")
+        return f"$\\geq {lo}$ levels" if hi == "+" else f"{lo}--{hi} levels"
+
+    head = "Feed & " + " & ".join(label(g) for g in groups) + " \\\\"
+    (out / "feedspeed.tex").write_text(_rows_tex(head, rows, "l" + "c" * len(groups)))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets", default="BTCUSDT,ETHUSDT")
@@ -350,6 +378,7 @@ def main() -> None:
         fn(Path("results") / a.exchange, a.assets.split(","), Path(a.out))
     zonewidth(Path("results") / a.exchange, Path(a.out))
     hazard(Path(a.out))
+    feedspeed(Path(a.out))
     print(f"wrote {a.out}/: all tables")
 
 

@@ -95,8 +95,13 @@ def flow_panel(
     fill_tol_us: int = 5_000,
     fill_expiry_us: int = 100_000,
     log: list[tuple[int, int, int, int, float, int]] | None = None,
+    coarsen_us: int = 0,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Return (flows, info).
+
+    ``coarsen_us`` > 0 emulates a slower feed: book messages are bundled into buckets of that
+    length on a fixed clock grid, changes at each price are netted within a bucket, and the
+    bucket is published at its end (e.g. 52 ms to compare a 20 ms feed with Binance).
 
     If ``log`` is given, every swept-side ``add`` and pure ``cancel`` (no fill part) is
     appended as ``(event, t_us since t0, d, +1 add / -1 cancel, size, depth_px)`` with
@@ -171,8 +176,13 @@ def flow_panel(
         while i < i1:
             m_ts = int(ts[i])
             k = i
-            while k < i1 and ts[k] == m_ts:
-                k += 1
+            if coarsen_us > 0:
+                m_ts = (m_ts // coarsen_us + 1) * coarsen_us  # published at bucket end
+                while k < i1 and ts[k] < m_ts:
+                    k += 1
+            else:
+                while k < i1 and ts[k] == m_ts:
+                    k += 1
             w = int(np.searchsorted(edges_us, m_ts - start, side="right")) - 1
             w = min(max(w, 0), n_win - 1)
             # load trades up to message time + tolerance into pools
@@ -195,6 +205,7 @@ def flow_panel(
             best_before = [_best(books[s], sgn[s]) for s in (0, 1)]
             changes: list[tuple[int, float, float, float]] = []  # (side, px, old, new)
             touched = set()
+            first_old: dict[tuple[int, float], float] = {}  # netting within a coarse bucket
             for r in range(i, k):
                 s = 0 if (bool(is_bid[r]) != buy) else 1
                 px, new = float(price[r]), float(amount[r])
@@ -205,7 +216,13 @@ def flow_panel(
                     full[s][px] = new
                 if emulate:
                     touched.add(s)
+                elif coarsen_us > 0:
+                    first_old.setdefault((s, px), old)
                 elif new != old:
+                    changes.append((s, px, old, new))
+            for (s, px), old in first_old.items():
+                new = full[s].get(px, 0.0)
+                if new != old:
                     changes.append((s, px, old, new))
             for s in sorted(touched):
                 vis = _top(full[s], n_levels, sgn[s])

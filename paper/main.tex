@@ -35,8 +35,8 @@ response predict the flows on held-out days; exponential recovery and a queue-re
 benchmark, in which flows depend only on the book's state, do not; local diffusion adds no
 predictive power; and the phases are nearly the same whether or not the price later continues
 in the sweep's direction. Across six books, withdrawal and the delayed arrival of new
-liquidity are general, but repositioning is not: it is weaker but present on the Binance BTC
-perpetual, whose tick is as small as Bybit's, and is absent on SOL and finer than the tick grid on XRP and LINK, the
+liquidity are general, but repositioning is not: on the Binance BTC perpetual, whose tick is as
+small as Bybit's, it is as strong as on Bybit once feed speed and sweep size are matched, and is absent on SOL and finer than the tick grid on XRP and LINK, the
 three large-tick books (most repositioned BTC and ETH liquidity moves less than 1--2 basis
 points). On the Bybit BTC and ETH books, the excess
 cost of a follow-up market order falls by about 90\% within 250\,ms; on the large-tick books
@@ -108,8 +108,8 @@ same whether or not the price later continues in the sweep's direction
 (Section~\ref{sec:info}): refill is a reaction to the sweep itself, timed from it, not a
 response to the book's state or to the sweep's information content. Withdrawal and the
 delayed source also appear on three thinner Bybit books with large ticks (SOL, XRP, LINK) and
-on the Binance BTC perpetual, but repositioning appears only on the small-tick books, strongly on
-Bybit BTC and ETH and weakly on Binance BTC. On BTC and ETH most moved liquidity travels less than 1--2\,bp, which
+on the Binance BTC perpetual, but repositioning appears only on the small-tick books (on Binance BTC
+it looks weaker, but a slower feed and smaller sweeps account for most of the gap). On BTC and ETH most moved liquidity travels less than 1--2\,bp, which
 on XRP and LINK lies inside the near zone; on SOL, where the grid is fine enough to see such
 moves, repositioning is an order of magnitude smaller; and on the large-tick books the excess
 execution cost decays far more slowly (Section~\ref{sec:robust}). This fits a queue-priority
@@ -714,9 +714,30 @@ liquidity after 250\,ms 0.24. Repositioning is present but much weaker than on B
 zone is widened to 50 ticks (0.006 at 0.6\,bp). Consistently, the follow-up execution excess
 decays more slowly than on Bybit (33\% of its 20\,ms value left at 250\,ms, against 13\%).
 Parametric models predict held-out Binance days poorly (cross-validated $R^2$ at most 0.32 for
-every model), so the model comparison is uninformative on this feed. Fast repositioning is
-therefore strong on the Bybit BTC and ETH books, weak but present on Binance BTC, and absent or
-unresolvable on the large-tick books.
+every model), so the model comparison is uninformative on this feed.
+
+Most of the gap to Bybit is measurement. Each Binance message nets all changes at a price over
+52\,ms, so a cancel-and-repost pair that a 20\,ms feed shows as two changes can vanish. To
+measure this, we re-run Bybit BTCUSDT with its messages netted into 52\,ms buckets on a fixed
+clock, published at the end of each bucket. Its repositioning falls from 0.17 to 0.065
+($[0.052, 0.078]$), while added $\div$ cancelled at placebo times stays at 1.04. Binance sweeps
+also clear fewer levels (median 52 against 73), and on both venues larger sweeps trigger more
+repositioning. Within the same range of levels cleared and at the same feed speed, the two
+venues are close (Table~\ref{tab:feedspeed}): 0.058 against 0.043 for sweeps clearing 40--80
+levels and 0.097 against 0.113 for more than 80, with overlapping intervals; only the smallest
+sweeps differ (0.028 against 0.002). Fast repositioning is therefore as strong on Binance BTC as
+on Bybit BTC once feed speed and sweep size are matched, and absent or unresolvable on the
+large-tick books. The emulation also shows that netting hides moves even at 20\,ms, so the
+Bybit repositioning masses are lower bounds.
+
+\begin{table}[ht]
+\centering
+\caption{Feed speed and repositioning. Excess repositioning before 250\,ms by levels cleared,
+for Bybit BTCUSDT at its 20\,ms feed, Bybit BTCUSDT with messages netted into 52\,ms buckets,
+and Binance BTCUSDT (52\,ms feed). NN placebo; 95\% day-cluster intervals.}
+\label{tab:feedspeed}
+\input{tables/feedspeed.tex}
+\end{table}
 
 \paragraph{Why the tick matters.} On a book whose tick is large relative to price, queues at
 each price are long and an order's place in the queue is valuable: \citet{moallemi2016queue}
@@ -782,7 +803,8 @@ Repositioning is large only on the three small-tick books.}
         (7.2 hours, 166 sweeps), on a spot venue, and its placebo matching is imperfect
         (standardised differences up to 0.25).
   \item \textbf{Push netting.} Each 20\,ms message nets changes at a price, so gross flows are
-        lower bounds.
+        lower bounds. Netting Bybit BTC messages into 52\,ms buckets removes 62\% of measured
+        repositioning, so part of it is probably lost at 20\,ms as well.
   \item \textbf{Fill matching.} About one third of sweep volume exceeds the displayed size at
         its price (hidden or newly posted liquidity); matchable volume is capped at displayed
         size so it cannot absorb later cancellations.
@@ -799,7 +821,7 @@ After a multi-level sweep, the deep Bitcoin and Ether perpetual order books refi
 phases: within the first $\sim$100\,ms liquidity is pulled and moved to the new price, and
 only after 0.4--0.8\,s is it made anew. Pulling first and making anew later is common to all
 six books we study. The fast move to the new price is not: it appears only on the three books
-whose tick is small relative to price (strongly on Bybit, weakly on Binance), and not on the
+whose tick is small relative to price (on Binance once its slower feed is accounted for), and not on the
 three large-tick books,
 where the cost of trading again also stays high for longer. Near-touch orders on the
 large-tick books turn over more slowly even in normal times, which fits the view that a place

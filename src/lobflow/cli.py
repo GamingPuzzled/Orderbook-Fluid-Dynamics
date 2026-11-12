@@ -139,6 +139,7 @@ def _flows_day(
     state_only: bool,
     tag: str = "flows",
     edges_ms: tuple[int, ...] | None = None,
+    coarsen_ms: float = 0.0,
 ) -> int:
     from lobflow.flows import DEFAULT_EDGES_MS
     from lobflow.pipeline import process_flows_day, process_state_day
@@ -146,7 +147,16 @@ def _flows_day(
     try:
         if not state_only:
             edges = edges_ms or DEFAULT_EDGES_MS
-            process_flows_day(parquet, events, exchange, symbol, day, edges_ms=edges, tag=tag)
+            process_flows_day(
+                parquet,
+                events,
+                exchange,
+                symbol,
+                day,
+                edges_ms=edges,
+                tag=tag,
+                coarsen_us=int(coarsen_ms * 1000),
+            )
         if tag == "flows":
             process_state_day(parquet, events, exchange, symbol, day)
     except Exception as exc:  # report and continue with other days
@@ -177,7 +187,17 @@ def _cmd_flows(a: argparse.Namespace) -> int:
             continue
         edges = tuple(int(x) for x in a.edges.split(",")) if a.edges else None
         jobs.append(
-            (Path(a.parquet), Path(a.events), a.exchange, a.symbol, day, a.state_only, a.tag, edges)
+            (
+                Path(a.parquet),
+                Path(a.events),
+                a.exchange,
+                a.symbol,
+                day,
+                a.state_only,
+                a.tag,
+                edges,
+                a.coarsen_ms,
+            )
         )
     return 1 if _run_days(_flows_day, jobs, a.workers) else 0
 
@@ -402,6 +422,12 @@ def build_parser() -> argparse.ArgumentParser:
     fl.add_argument("--days", default=None, help="comma-separated subset of days")
     fl.add_argument("--tag", default="flows", help="output file tag (alternative grids)")
     fl.add_argument("--edges", default=None, help="window edges in ms, e.g. 0,20,40,100")
+    fl.add_argument(
+        "--coarsen-ms",
+        type=float,
+        default=0.0,
+        help="emulate a slower feed: net book messages in buckets of this length",
+    )
     fl.add_argument(
         "--state-only", action="store_true", help="only write pre-event state covariates"
     )

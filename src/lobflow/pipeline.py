@@ -93,6 +93,7 @@ def process_flows_day(
     n_placebo: int = 2000,
     seed: int = 0,
     tag: str = "flows",
+    coarsen_us: int = 0,
 ) -> dict[str, int]:
     """Gross-flow (mass balance) outputs for a day already run through ``process_day``.
 
@@ -115,7 +116,9 @@ def process_flows_day(
     sp = SweepParams(**meta["sweep_params"])
     runs = detect_sweeps(trades, tk, sp)
     ev = pl.read_parquet(ev_path).sort("event_id")
-    n_pl = _write_flows(out, day, arrays, trades, runs, ev, tk, edges_ms, n_placebo, seed, tag)
+    n_pl = _write_flows(
+        out, day, arrays, trades, runs, ev, tk, edges_ms, n_placebo, seed, tag, coarsen_us
+    )
     log.info("%s %s %s: flows for %d events, %d placebo", exchange, symbol, day, ev.height, n_pl)
     return {"n_events": ev.height, "n_placebo": n_pl}
 
@@ -132,6 +135,7 @@ def _write_flows(
     n_placebo: int,
     seed: int,
     tag: str = "flows",
+    coarsen_us: int = 0,
 ) -> int:
     """Write sweep and placebo gross-flow tables; ``trades`` sorted, ``ev`` sorted by id."""
     tr = (
@@ -146,7 +150,9 @@ def _write_flows(
         f"{tag}_placebo": (t_pl, pl_buy),
     }
     for name, (t0, is_buy) in sets.items():
-        flows, info = flow_panel(arrays, *tr, t0, is_buy, tk, edges_ms=edges_ms)
+        flows, info = flow_panel(
+            arrays, *tr, t0, is_buy, tk, edges_ms=edges_ms, coarsen_us=coarsen_us
+        )
         flows.write_parquet(out / f"{day}_{name}.parquet")
         info.with_columns(pl.Series("is_buy", is_buy)).write_parquet(
             out / f"{day}_{name}_info.parquet"
