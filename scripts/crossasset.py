@@ -8,7 +8,8 @@ writes, for all of them at once:
   left at 250 ms ("cens." when more than 20% of follow-up walks still exhaust the 50-tick
   profile at 250 ms);
 - figures/fig4_cross_asset.{png,pdf} (+ paper/figures copy): forest plot of κ(20–40) and the
-  repositioning share, and the three phase centroids per asset.
+  repositioning mass (< 250 ms), and the three phase centroids per asset, rows ordered by
+  relative tick size.
 
 Rows missing an optional input (PDE, execution) show "--". An asset whose placebo added ÷
 cancelled ratio lies outside PLACEBO_KAPPA is skipped: its flow accounting is broken.
@@ -190,14 +191,23 @@ def table(rows: list[Row], out: Path) -> None:
 
 
 def figure(rows: list[Row], out: Path, paper_out: Path) -> None:
-    labels = [f"{r.venue} {r.symbol}" for r in rows]
+    rows = sorted(rows, key=lambda r: r.tick_bp if r.tick_bp is not None else np.inf)
+    labels = [
+        f"{r.venue} {r.symbol}" + ("" if r.tick_bp is None else f"\n(tick {r.tick_bp:.3f} bp)")
+        for r in rows
+    ]
     y = np.arange(len(rows))[::-1]
     fig, axes = plt.subplots(
-        1, 3, figsize=(9.6, 0.5 * len(rows) + 1.6), sharey=True, width_ratios=[1, 1, 1.4]
+        1, 3, figsize=(9.6, 0.6 * len(rows) + 1.6), sharey=True, width_ratios=[1, 1, 1.4]
     )
     for ax, stat, title, ref in (
         (axes[0], "kappa_20-40", "added ÷ cancelled, 20–40 ms", 1.0),
-        (axes[1], "transport_share_<250ms", "repositioning share, < 250 ms", None),
+        (
+            axes[1],
+            "transport_<250ms",
+            "repositioning, < 250 ms\n(fraction of pre-sweep depth)",
+            None,
+        ),
     ):
         v = np.array([r.stats[stat] for r in rows])
         ax.errorbar(
@@ -229,7 +239,9 @@ def figure(rows: list[Row], out: Path, paper_out: Path) -> None:
     axes[0].set_ylim(-0.6, y.max() + 0.8)
     for a in axes:
         a.grid(axis="y", visible=False)
-    fig.suptitle("The three-phase refill across assets and venues (95% CIs)", y=1.06)
+    fig.suptitle(
+        "The three-phase refill across books, ordered by relative tick size (95% CIs)", y=1.0
+    )
     _save(fig, out, "fig4_cross_asset")
     paper_out.mkdir(parents=True, exist_ok=True)
     shutil.copy(out / "fig4_cross_asset.pdf", paper_out / "fig4_cross_asset.pdf")

@@ -766,8 +766,10 @@ local minus the common model (Section~\ref{sec:pde}). Exec.\ left: follow-up exc
 \begin{figure}[ht]
 \centering
 \includegraphics[width=\textwidth]{figures/fig4_cross_asset.pdf}
-\caption{The three-phase refill by asset and venue: early net depletion, the repositioning
-share, and the timing of the three phases (95\% day-cluster intervals).}
+\caption{The three-phase refill by book, ordered by relative tick size: early net depletion,
+excess repositioning before 250\,ms (fraction of pre-sweep swept-side depth; CEM placebo, as
+in Table~\ref{tab:phases}), and the timing of the three phases (95\% day-cluster intervals).
+Repositioning is large only on the three small-tick books.}
 \label{fig:cross}
 \end{figure}
 
@@ -794,9 +796,12 @@ share, and the timing of the three phases (95\% day-cluster intervals).}
 \section{Conclusion}
 After a multi-level sweep, the deep Bitcoin and Ether perpetual order books refill in three
 phases: within the first $\sim$100\,ms liquidity is pulled and moved to the new price, and
-only after 0.4--0.8\,s is it made anew. On thinner books with large ticks, liquidity is
-still pulled first and made anew later, but the fast move to the new price is absent or
-finer than one tick, and the cost of trading again stays high for longer. The sequencing
+only after 0.4--0.8\,s is it made anew. Pulling first and making anew later is common to all
+six books we study. The fast move to the new price is not: it appears on the three books
+whose tick is small relative to price, on two venues, and not on the three large-tick books,
+where the cost of trading again also stays high for longer. Near-touch orders on the
+large-tick books turn over more slowly even in normal times, which fits the view that a place
+in a long queue is too valuable to give up by moving. The sequencing
 is invisible in aggregate resilience measures and in best-quote studies, and it is inconsistent
 with diffusion-type continuum models at sub-second horizons on small-tick books. For execution, the excess cost
 of a follow-up order falls by about 90\% within 250\,ms, during repositioning, while total
