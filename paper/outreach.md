@@ -41,7 +41,7 @@ cancellations and fills, which gives a mass balance of the swept side.
    price) withdrawal, early net depletion and delayed new liquidity replicate, but the fast
    move does not: on BTC/ETH most moved liquidity travels < 1–2 bp, below the alts' tick grid,
    and on SOL, where it would be visible, it is 20× smaller. Execution costs there recover
-   far more slowly. On Binance BTC (same small tick, other venue) repositioning reappears.
+   far more slowly. On Binance BTC (same small tick, other venue) it is present but much weaker.
 5. **Execution.** A follow-up market order pays 2–3× the normal cost 20 ms after a sweep, but
    about 90% of that excess is gone within 250 ms, during repositioning.
 6. **Order-level check (preliminary).** On Bitstamp, about a quarter of near-touch liquidity is
@@ -49,7 +49,7 @@ cancellations and fills, which gives a mass balance of the swept side.
    "moving" liquidity is routine.
 
 **Status.** Full pipeline (Python, tested, public on GitHub); draft paper written; replications
-on SOL, XRP, LINK (Bybit) and 4 Binance BTC days done; remaining Binance days downloading; Bitstamp order-level recording ongoing.
+on SOL, XRP, LINK (Bybit) and 12 Binance BTC days done; OKX downloading; Bitstamp order-level recording ongoing.
 
 **What I'm looking for.** A faculty mentor or co-author to review the framing and help prepare
 the paper for submission (target: *Quantitative Finance*).

@@ -35,10 +35,10 @@ response predict the flows on held-out days; exponential recovery and a queue-re
 benchmark, in which flows depend only on the book's state, do not; local diffusion adds no
 predictive power; and the phases are nearly the same whether or not the price later continues
 in the sweep's direction. Across six books, withdrawal and the delayed arrival of new
-liquidity are general, but repositioning is not: it reappears on the Binance BTC perpetual,
-whose tick is as small as Bybit's, and is absent on SOL and finer than the tick grid on XRP and LINK, the
+liquidity are general, but repositioning is not: it is weaker but present on the Binance BTC
+perpetual, whose tick is as small as Bybit's, and is absent on SOL and finer than the tick grid on XRP and LINK, the
 three large-tick books (most repositioned BTC and ETH liquidity moves less than 1--2 basis
-points). Where repositioning is present, the excess
+points). On the Bybit BTC and ETH books, the excess
 cost of a follow-up market order falls by about 90\% within 250\,ms; on the large-tick books
 most of it remains.
 \end{abstract}
@@ -108,8 +108,8 @@ same whether or not the price later continues in the sweep's direction
 (Section~\ref{sec:info}): refill is a reaction to the sweep itself, timed from it, not a
 response to the book's state or to the sweep's information content. Withdrawal and the
 delayed source also appear on three thinner Bybit books with large ticks (SOL, XRP, LINK) and
-on the Binance BTC perpetual, but repositioning appears only on the small-tick books: Bybit BTC
-and ETH and Binance BTC. On BTC and ETH most moved liquidity travels less than 1--2\,bp, which
+on the Binance BTC perpetual, but repositioning appears only on the small-tick books, strongly on
+Bybit BTC and ETH and weakly on Binance BTC. On BTC and ETH most moved liquidity travels less than 1--2\,bp, which
 on XRP and LINK lies inside the near zone; on SOL, where the grid is fine enough to see such
 moves, repositioning is an order of magnitude smaller; and on the large-tick books the excess
 execution cost decays far more slowly (Section~\ref{sec:robust}). This fits a queue-priority
@@ -159,7 +159,7 @@ streams on the exchange clock rather than on receipt time.
 October 2026 (BTCUSDT) and November 2026 (ETHUSDT). Table~\ref{tab:sample} summarises it.
 For replication (Section~\ref{sec:robust}) we add the Bybit SOLUSDT, XRPUSDT and LINKUSDT
 perpetuals on the same first-of-month days and with the same feed filter (31, 21 and 25 days
-with matched placebo times), and the Binance BTCUSDT perpetual (four quarterly days so far;
+with matched placebo times), and the Binance BTCUSDT perpetual (twelve quarterly days;
 its feed publishes the full book every 52\,ms, see Section~\ref{sec:robust}).
 
 \begin{table}[ht]
@@ -701,21 +701,22 @@ books; withdrawal, early net depletion and a delayed source of new liquidity are
 all five.
 
 \paragraph{Another venue.} The Binance BTCUSDT perpetual has nearly the same relative tick as
-Bybit BTCUSDT (0.017 against 0.014\,bp) but a different participant base, so it separates the tick from the
-venue. Its free Tardis feed publishes about 1{,}000 levels every 52\,ms; we replay the full
-book but classify changes only within the best 50 levels per side, as on Bybit (deep levels of
-the full-depth feed go stale, which otherwise appears as spurious additions; with the
-restriction, added $\div$ cancelled at placebo times is 1.05). On four days so far (1{,}241
-sweeps; the 52\,ms push interval blurs the first two windows), the pattern is the BTC one.
-Additions fall short of cancellations at 20--40\,ms ($\kappa = 0.58$, interval
-$[0.13, 0.93]$) and exceed them at 250--1000\,ms (1.11, as on Bybit); withdrawal before
-250\,ms is 0.22 of pre-sweep depth, the same as on Bybit; repositioning is 0.075
-($[0.040, 0.116]$), less than half of Bybit's 0.17 but clearly positive, supplies the whole
-near-touch rebuild before 250\,ms, and, as on Bybit, almost vanishes once the near zone is
-widened to 50 ticks (0.006 at 0.9\,bp); and the follow-up execution excess falls to 13\% of
-its 20\,ms value by 250\,ms, as on Bybit. Phase centroids are 98, 238 and 503\,ms. Fast
-repositioning therefore appears on both small-tick BTC books, on two venues, and on none of
-the large-tick books.
+Bybit BTCUSDT (0.013 against 0.014\,bp) but a different participant base, so it separates the
+tick from the venue. Its free Tardis feed publishes about 1{,}000 levels every 52\,ms; we
+replay the full book but classify changes only within the best 50 levels per side, as on Bybit
+(deep levels of the full-depth feed go stale, which otherwise appears as spurious additions;
+with the restriction, added $\div$ cancelled at placebo times is 1.07). Over twelve quarterly
+days (5{,}958 sweeps; the 52\,ms push interval blurs the first two windows), withdrawal, early
+net depletion and the late source replicate: $\kappa = 0.69$ ($[0.56, 0.83]$) at 20--40\,ms
+and 1.18 at 250--1000\,ms, withdrawal before 250\,ms is 0.13 of pre-sweep depth, and new
+liquidity after 250\,ms 0.24. Repositioning is present but much weaker than on Bybit: 0.038
+($[0.007, 0.083]$), about a fifth of Bybit's 0.17, and, as on Bybit, it vanishes once the near
+zone is widened to 50 ticks (0.006 at 0.6\,bp). Consistently, the follow-up execution excess
+decays more slowly than on Bybit (33\% of its 20\,ms value left at 250\,ms, against 13\%).
+Parametric models predict held-out Binance days poorly (cross-validated $R^2$ at most 0.32 for
+every model), so the model comparison is uninformative on this feed. Fast repositioning is
+therefore strong on the Bybit BTC and ETH books, weak but present on Binance BTC, and absent or
+unresolvable on the large-tick books.
 
 \paragraph{Why the tick matters.} On a book whose tick is large relative to price, queues at
 each price are long and an order's place in the queue is valuable: \citet{moallemi2016queue}
@@ -788,8 +789,8 @@ Repositioning is large only on the three small-tick books.}
   \item \textbf{Venue and assets.} One derivatives venue. The full three-phase structure
         holds for its two deepest books; on three thinner, large-tick books repositioning is
         either absent (SOL) or finer than the tick grid can resolve (XRP, LINK). The second
-        derivatives venue (Binance) has four days so far and a 52\,ms feed.
-        \todo{Binance: all 12 days.}
+        derivatives venue (Binance) has a 52\,ms feed, on which parametric models fit
+        poorly.
 \end{itemize}
 
 %----------------------------------------------------------------------------------------------
@@ -797,8 +798,9 @@ Repositioning is large only on the three small-tick books.}
 After a multi-level sweep, the deep Bitcoin and Ether perpetual order books refill in three
 phases: within the first $\sim$100\,ms liquidity is pulled and moved to the new price, and
 only after 0.4--0.8\,s is it made anew. Pulling first and making anew later is common to all
-six books we study. The fast move to the new price is not: it appears on the three books
-whose tick is small relative to price, on two venues, and not on the three large-tick books,
+six books we study. The fast move to the new price is not: it appears only on the three books
+whose tick is small relative to price (strongly on Bybit, weakly on Binance), and not on the
+three large-tick books,
 where the cost of trading again also stays high for longer. Near-touch orders on the
 large-tick books turn over more slowly even in normal times, which fits the view that a place
 in a long queue is too valuable to give up by moving. The sequencing
