@@ -176,8 +176,10 @@ def subset_stats(
     seed: int = 0,
     near_zones: Sequence[str] = NEAR,
     deep_zones: Sequence[str] = DEEP,
+    stats: Sequence[str] = STATS,
 ) -> dict[str, float]:
-    """Point estimates and bootstrap CIs (``<stat>_lo``/``_hi``) for one subset."""
+    """Point estimates and bootstrap CIs (``<stat>_lo``/``_hi``) for one subset; ``stats``
+    may add any key of :func:`lobflow.model.observed_summary` (e.g. ``transport``)."""
     one, days = subset_point_fn(
         s_flows, s_info, p_flows, p_info, w, windows, near_zones=near_zones, deep_zones=deep_zones
     )
@@ -188,7 +190,7 @@ def subset_stats(
         "n_sweeps": float(s_info.filter(pl.col("day").is_in(days), pl.col("valid")).height)
     }
     res["n_days"] = float(len(days))
-    for st in STATS:
+    for st in stats:
         b = np.array([x[st] for x in boots], dtype=float)
         res[st] = point[st]
         res[f"{st}_lo"] = float(np.nanpercentile(b, 2.5))

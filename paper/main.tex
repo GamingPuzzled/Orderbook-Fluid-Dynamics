@@ -114,7 +114,7 @@ on XRP and LINK lies inside the near zone; on SOL, where the grid is fine enough
 moves, repositioning is an order of magnitude smaller; and on the large-tick books the excess
 execution cost decays far more slowly (Section~\ref{sec:robust}). This fits a queue-priority
 explanation: where the tick is large, a place in the queue is valuable and re-posting gives it
-up, and near-touch orders on the large-tick books are cancelled two to five times more slowly
+up, and near-touch orders on the large-tick books are cancelled two to six times more slowly
 even in normal times. The
 best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
@@ -716,19 +716,26 @@ decays more slowly than on Bybit (33\% of its 20\,ms value left at 250\,ms, agai
 Parametric models predict held-out Binance days poorly (cross-validated $R^2$ at most 0.32 for
 every model), so the model comparison is uninformative on this feed.
 
-Most of the gap to Bybit is measurement. Each Binance message nets all changes at a price over
-52\,ms, so a cancel-and-repost pair that a 20\,ms feed shows as two changes can vanish. To
-measure this, we re-run Bybit BTCUSDT with its messages netted into 52\,ms buckets on a fixed
-clock, published at the end of each bucket. Its repositioning falls from 0.17 to 0.065
-($[0.052, 0.078]$), while added $\div$ cancelled at placebo times stays at 1.04. Binance sweeps
+Most of the gap to Bybit is measurement. Each Binance message nets all changes over 52\,ms,
+and each change is placed relative to the opposite quote before the message, so a move that
+falls in the same message as the sweep, or as the quote change it follows, is recorded as
+deep-book churn rather than as a move to the touch. To measure this, we re-run Bybit BTCUSDT
+with its messages netted into 52, 100 and 200\,ms buckets on a fixed clock, published at the
+end of each bucket. Measured repositioning falls from 0.17 at 20\,ms to 0.065
+($[0.052, 0.078]$) at 52\,ms, 0.011 ($[0.005, 0.017]$) at 100\,ms and zero at 200\,ms, while
+added $\div$ cancelled at placebo times stays between 1.03 and 1.06, so the flow accounting
+remains intact and only the move becomes invisible. Binance sweeps
 also clear fewer levels (median 52 against 73), and on both venues larger sweeps trigger more
 repositioning. Within the same range of levels cleared and at the same feed speed, the two
 venues are close (Table~\ref{tab:feedspeed}): 0.058 against 0.043 for sweeps clearing 40--80
 levels and 0.097 against 0.113 for more than 80, with overlapping intervals; only the smallest
 sweeps differ (0.028 against 0.002). Fast repositioning is therefore as strong on Binance BTC as
 on Bybit BTC once feed speed and sweep size are matched, and absent or unresolvable on the
-large-tick books. The emulation also shows that netting hides moves even at 20\,ms, so the
-Bybit repositioning masses are lower bounds.
+large-tick books. The emulation also shows that coarse messages hide moves, so the Bybit
+repositioning masses measured at 20\,ms are lower bounds; measured repositioning falls by a
+factor of $e$ for about every 30\,ms of netting. It also makes a prediction for feeds slower
+than Binance's: a venue that publishes every 100\,ms should show almost no repositioning
+with this method, whatever its true size.
 
 \begin{table}[ht]
 \centering
@@ -803,16 +810,16 @@ Repositioning is large only on the three small-tick books.}
         (7.2 hours, 166 sweeps), on a spot venue, and its placebo matching is imperfect
         (standardised differences up to 0.25).
   \item \textbf{Push netting.} Each 20\,ms message nets changes at a price, so gross flows are
-        lower bounds. Netting Bybit BTC messages into 52\,ms buckets removes 62\% of measured
-        repositioning, so part of it is probably lost at 20\,ms as well.
+        lower bounds. Netting Bybit BTC messages into 52 and 100\,ms buckets removes 62\% and 94\%
+        of measured repositioning, so part of it is probably lost at 20\,ms as well, and the
+        method cannot measure repositioning on feeds of 100\,ms or slower.
   \item \textbf{Fill matching.} About one third of sweep volume exceeds the displayed size at
         its price (hidden or newly posted liquidity); matchable volume is capped at displayed
         size so it cannot absorb later cancellations.
-  \item \textbf{Venue and assets.} One derivatives venue. The full three-phase structure
-        holds for its two deepest books; on three thinner, large-tick books repositioning is
-        either absent (SOL) or finer than the tick grid can resolve (XRP, LINK). The second
-        derivatives venue (Binance) has a 52\,ms feed, on which parametric models fit
-        poorly.
+  \item \textbf{Venues and assets.} Two derivatives venues, both on free first-of-month days.
+        On Bybit the full three-phase structure holds for the two deepest books; on three thinner, large-tick books repositioning is
+        either absent (SOL) or finer than the tick grid can resolve (XRP, LINK). Binance has
+        only twelve days and a 52\,ms feed, on which parametric models fit poorly.
 \end{itemize}
 
 %----------------------------------------------------------------------------------------------
@@ -838,7 +845,8 @@ arrives.
 
 \section*{Data and code availability}
 The level-2 order book and trade data are the free first-of-month files published by Tardis.dev
-\citep{tardis} for Bybit linear perpetual futures (BTCUSDT, ETHUSDT); they are not
+\citep{tardis} for Bybit linear perpetual futures (BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT,
+LINKUSDT) and the Binance USDT-margined BTCUSDT perpetual; they are not
 redistributed, but the code downloads them. The Bitstamp order-level data were recorded from
 Bitstamp's public websocket feed (\texttt{live\_orders\_btcusd}, \texttt{live\_trades\_btcusd}) and
 REST order book snapshots, which require no account. All code, the derived results from which

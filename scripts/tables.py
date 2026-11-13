@@ -345,8 +345,10 @@ def feedspeed(out: Path) -> None:
         return
     tab = pl.read_parquet(f)
     groups = tab["levels_cleared"].unique(maintain_order=True).to_list()
+    # rows split by levels cleared only (the feed-speed curve is reported in the text)
+    split = tab.group_by("set", maintain_order=True).agg(pl.len()).filter(pl.col("len") > 1)
     rows = []
-    for name in tab["set"].unique(maintain_order=True).to_list():
+    for name in split["set"].to_list():
         cells = [name]
         for g in groups:
             r = tab.filter((pl.col("set") == name) & (pl.col("levels_cleared") == g)).row(
