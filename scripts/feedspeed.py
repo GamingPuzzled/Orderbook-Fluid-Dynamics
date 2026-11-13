@@ -23,7 +23,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 import polars as pl
 
 from lobflow.robustness import STATS, match_within_day, prepare_subsets, subset_stats
@@ -127,18 +126,6 @@ def main() -> None:
                 f"{_cell(r, 'transport')} | {r['transport_<250ms'] / b250:.2f} | "
                 f"{r['transport'] / btot:.2f} |"
             )
-        pos = curve.filter(pl.col("transport_<250ms") > 0).sort("feed_ms")
-        if pos.height >= 2:
-            # exponential decay in the netting interval: log mass linear in milliseconds
-            ms = pos["feed_ms"].to_numpy().astype(float)
-            slope, icpt = np.polyfit(ms, np.log(pos["transport_<250ms"].to_numpy()), 1)
-            lines += [
-                "",
-                f"Exponential fit on positive points ({', '.join(map(str, pos['feed_ms']))} ms): "
-                f"measured repositioning <250 falls by a factor e every {-1 / slope:.0f} ms of "
-                f"netting; extrapolated to no netting: {np.exp(icpt):.3f} (20 ms observed "
-                f"{b250:.3f}). Extrapolation is indicative only.",
-            ]
     text = "\n".join(lines) + "\n"
     (out / "feedspeed.md").write_text(text)
     print(text)

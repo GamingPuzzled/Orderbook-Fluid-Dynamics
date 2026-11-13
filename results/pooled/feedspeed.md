@@ -27,5 +27,3 @@ Excess (sweep − NN placebo) masses, fractions of pre-sweep swept depth, 95% da
 | 52 | 1.043 | 0.065 [0.052, 0.078] | 0.084 [0.072, 0.099] | 0.38 | 0.31 |
 | 100 | 1.053 | 0.011 [0.005, 0.017] | 0.019 [0.009, 0.035] | 0.06 | 0.07 |
 | 200 | 1.057 | 0.000 [0.000, 0.000] | 0.000 [0.000, 0.003] | 0.00 | 0.00 |
-
-Exponential fit on positive points (20, 52, 100 ms): measured repositioning <250 falls by a factor e every 29 ms of netting; extrapolated to no netting: 0.365 (20 ms observed 0.173). Extrapolation is indicative only.
