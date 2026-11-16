@@ -165,8 +165,8 @@ def parse_file(path: Path) -> pl.DataFrame:
 class Snapshot:
     recv_us: int
     t_us: int
-    bids: list[tuple[int, int, int]]  # (id, px cents, amt sat)
-    asks: list[tuple[int, int, int]]
+    bids: npt.NDArray[np.int64] | list[tuple[int, int, int]]  # rows (id, px cents, amt sat)
+    asks: npt.NDArray[np.int64] | list[tuple[int, int, int]]
 
 
 def load_snapshot(path: Path) -> Snapshot:
@@ -174,8 +174,12 @@ def load_snapshot(path: Path) -> Snapshot:
         b = json.load(fh)
     recv = int(path.name.split("_")[1].split(".")[0])
 
-    def side(rows: list[list[str]]) -> list[tuple[int, int, int]]:
-        return [(int(r[2]), _key(r[0], CENT), _key(r[1], SAT)) for r in rows]
+    def side(rows: list[list[str]]) -> npt.NDArray[np.int64]:
+        # compact (n, 3) array: a week of 15-minute snapshots as Python tuples takes gigabytes
+        out = np.array(
+            [(int(r[2]), _key(r[0], CENT), _key(r[1], SAT)) for r in rows], dtype=np.int64
+        )
+        return out.reshape(-1, 3)
 
     return Snapshot(recv, int(b["microtimestamp"]), side(b["bids"]), side(b["asks"]))
 
@@ -217,19 +221,49 @@ def load_events(
 
     if until_us is not None:
         files = [f for f in files if hour_start(f) < until_us]
-    parts = []
+    caches = []
     for f in files:
         c = cache_root / f.parent.name / f"{f.name.split('.')[0]}.v{CACHE_VERSION}.parquet"
         if not c.exists() or c.stat().st_mtime < f.stat().st_mtime:
             c.parent.mkdir(parents=True, exist_ok=True)
             parse_file(f).write_parquet(c)
-        parts.append(pl.read_parquet(c))
-    if not parts:
+        caches.append(c)
+    if not caches:
         return pl.DataFrame(schema=SCHEMA)
-    ev = pl.concat(parts).sort("recv_us", "seq", maintain_order=True)
+    ev = _concat_sorted(caches)
     if until_us is not None:
         ev = ev.filter(pl.col("recv_us") < until_us)
     return ev
+
+
+def _concat_sorted(caches: Sequence[Path]) -> pl.DataFrame:
+    """Cached hourly frames concatenated in (recv_us, seq) order, with peak memory close to the
+    result: each hour is sorted on its own and copied into preallocated arrays, and the global
+    order is checked (hours almost never overlap); only if it fails is the whole frame sorted.
+    """
+    n = sum(pq_rows(c) for c in caches)
+    first = pl.read_parquet(caches[0])
+    cols = {c: np.empty(n, dtype=first[c].to_numpy().dtype) for c in first.columns}
+    a = 0
+    for c in caches:
+        part = (first if c == caches[0] else pl.read_parquet(c)).sort(
+            "recv_us", "seq", maintain_order=True
+        )
+        if part.null_count().sum_horizontal().item():
+            raise ValueError(f"unexpected nulls in {c}")
+        for name, arr in cols.items():
+            arr[a : a + part.height] = part[name].to_numpy()
+        a += part.height
+    del first
+    ev = pl.DataFrame({name: pl.Series(name, arr) for name, arr in cols.items()})
+    r, s = cols["recv_us"], cols["seq"]
+    ordered = bool(((r[1:] > r[:-1]) | ((r[1:] == r[:-1]) & (s[1:] >= s[:-1]))).all())
+    return ev if ordered else ev.sort("recv_us", "seq", maintain_order=True)
+
+
+def pq_rows(path: Path) -> int:
+    """Row count of a parquet file from its metadata."""
+    return int(pl.scan_parquet(path).select(pl.len()).collect().item())
 
 
 def load_snapshots(raw_root: Path) -> list[Snapshot]:
@@ -360,12 +394,56 @@ def segments(
     return out
 
 
+def segment_ids(events: pl.DataFrame, snaps: Sequence[Snapshot]) -> npt.NDArray[np.int64]:
+    """Segment index of each row that :func:`replay` applies (-1 elsewhere), without replaying.
+
+    A row is applied when it lies in a segment, is not a subscription marker or trade, and is
+    not time-stamped before the segment's snapshot; this does not depend on the book state, so
+    it needs no replay (used to place placebo times)."""
+    seg = np.full(len(events), -1, dtype=np.int64)
+    t = events["t_us"].to_numpy()
+    evc = events["ev"].to_numpy()
+    for k, (lo, hi, snap) in enumerate(segments(events, snaps)):
+        ok = (evc[lo:hi] != EV_SUB) & (evc[lo:hi] != EV_TRADE) & (t[lo:hi] >= snap.t_us)
+        seg[lo:hi][ok] = k
+    return seg
+
+
+def segment_spans(events: pl.DataFrame, snaps: Sequence[Snapshot]) -> pl.DataFrame:
+    """For each segment, its first and last applied event time, as rows (seg, t_us): all that
+    :func:`placebo_times` reads from a replayed frame, at a tiny fraction of its size."""
+    seg = segment_ids(events, snaps)
+    t = events["t_us"].to_numpy()
+    rows: list[tuple[int, int]] = []
+    for k in np.unique(seg[seg >= 0]).tolist():
+        tk = t[seg == k]
+        rows += [(k, int(tk.min())), (k, int(tk.max()))]
+    return pl.DataFrame(rows, schema={"seg": pl.Int64, "t_us": pl.Int64}, orient="row")
+
+
+def _in_windows(
+    t: npt.NDArray[np.int64], lo: npt.NDArray[np.int64], hi: npt.NDArray[np.int64]
+) -> npt.NDArray[np.bool_]:
+    """Whether each time in ``t`` lies in any closed interval [lo_j, hi_j]."""
+    if lo.size == 0:
+        return np.zeros(t.shape[0], dtype=np.bool_)
+    order = np.argsort(lo)
+    lo, hi = lo[order], np.maximum.accumulate(hi[order])
+    out = np.empty(t.shape[0], dtype=np.bool_)
+    step = 10_000_000
+    for a in range(0, t.shape[0], step):
+        j = np.searchsorted(lo, t[a : a + step], side="right") - 1
+        out[a : a + step] = (j >= 0) & (t[a : a + step] <= hi[np.maximum(j, 0)])
+    return out
+
+
 def replay(
     events: pl.DataFrame,
     snaps: Sequence[Snapshot],
     anchors: pl.DataFrame | None = None,
     *,
     depth_bps: float = 10.0,
+    keep_ms: tuple[int, int] | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Replay each connection segment from its snapshot.
 
@@ -374,11 +452,14 @@ def replay(
     opposite best at ``t_pre`` and the anchor's ``seg``). Anchors need columns ``aid``,
     ``t_pre`` (µs) and ``book_side``. Events time-stamped before the snapshot are skipped
     (already reflected); later ones are applied idempotently.
+
+    With ``keep_ms`` = (lo, hi), only rows whose time lies within [t_end + lo, t_end + hi] ms
+    of some anchor (plus all trades) are returned, which keeps a multi-day sample in memory;
+    a ``prev_px`` column (the price of the same order's previous applied event, as
+    :func:`window_flows` would compute over all rows) is added so that in-place moves are still
+    recognised at the edge of a window.
     """
     n = len(events)
-    bid = np.zeros(n, dtype=np.int64)
-    ask = np.zeros(n, dtype=np.int64)
-    seg_id = np.full(n, -1, dtype=np.int64)
     t = events["t_us"].to_numpy()
     evc = events["ev"].to_numpy()
     oid = events["id"].to_numpy()
@@ -392,10 +473,30 @@ def replay(
     a_side = a_sorted["book_side"].to_numpy()
     a_depth = np.full(len(a_sorted), np.nan)
     a_seg = np.full(len(a_sorted), -1, dtype=np.int64)
+    track = keep_ms is not None
+    # rows whose state is stored: all, or (with keep_ms) those inside an anchor window plus
+    # trades; slot[i] = position in the stored arrays, -1 if not stored
+    if keep_ms is not None:
+        a_end = (a_sorted["t_end"] if "t_end" in a_sorted.columns else a_sorted["t_pre"]).to_numpy()
+        store = _in_windows(t, a_end + keep_ms[0] * 1000, a_end + keep_ms[1] * 1000)
+        store |= evc == EV_TRADE
+    else:
+        store = np.ones(n, dtype=np.bool_)
+    rows_stored = np.flatnonzero(store)
+    slot = np.full(n, -1, dtype=np.int32 if n < 2**31 - 1 else np.int64)
+    slot[rows_stored] = np.arange(rows_stored.shape[0])
+    del store
+    m = rows_stored.shape[0]
+    bid = np.zeros(m, dtype=np.int64)
+    ask = np.zeros(m, dtype=np.int64)
+    seg_id = np.full(m, -1, dtype=np.int64)
+    prev_px = np.zeros(m if track else 0, dtype=np.int64)
+    has_prev = np.zeros(m if track else 0, dtype=np.bool_)
+    last_px: dict[int, int] = {}
     for k, (lo, hi, snap) in enumerate(segments(events, snaps)):
         book = Book()
         for s, rows in ((0, snap.bids), (1, snap.asks)):
-            for o, p, q in rows:
+            for o, p, q in np.asarray(rows, dtype=np.int64).reshape(-1, 3).tolist():
                 book.add(o, s, p, q)
         book.stale_candidates = set(book.orders)
         t_end = t[hi - 1] if hi > lo else snap.t_us
@@ -407,16 +508,41 @@ def replay(
                 a_depth[ai] = book.depth_within(int(a_side[ai]), depth_bps)
                 a_seg[ai] = k
                 ai += 1
-            bid[i], ask[i], seg_id[i] = book.best(0), book.best(1), k
+            j = slot[i]
+            if j >= 0:
+                bid[j], ask[j], seg_id[j] = book.best(0), book.best(1), k
+            if track:
+                o = int(oid[i])
+                last = last_px.get(o)
+                if last is not None and j >= 0:
+                    prev_px[j], has_prev[j] = last, True
+                if evc[i] == EV_DELETE:
+                    last_px.pop(o, None)
+                else:
+                    last_px[o] = int(px[i])
             if evc[i] == EV_DELETE:
                 book.remove(int(oid[i]))
             else:
                 book.stale_candidates.discard(int(oid[i]))
                 book.add(int(oid[i]), int(side[i]), int(px[i]), int(amt[i]))
             book.prune_crossed()
-    out = events.with_columns(
-        pl.Series("seg", seg_id), pl.Series("bid", bid), pl.Series("ask", ask)
-    ).filter((pl.col("seg") >= 0) | (pl.col("ev") == EV_TRADE))
+    del slot
+    loc = np.flatnonzero((seg_id >= 0) | (evc[rows_stored] == EV_TRADE))
+    idx = rows_stored[loc]
+    out = events[idx].with_columns(
+        pl.Series("seg", seg_id[loc]), pl.Series("bid", bid[loc]), pl.Series("ask", ask[loc])
+    )
+    if track:
+        out = (
+            out.with_columns(
+                pl.Series("prev_px", np.where(has_prev[loc], prev_px[loc], 0)).cast(pl.Int64),
+                pl.Series("has_prev", has_prev[loc]),
+            )
+            .with_columns(
+                pl.when(pl.col("has_prev")).then(pl.col("prev_px")).otherwise(None).alias("prev_px")
+            )
+            .drop("has_prev")
+        )
     anc = a_sorted.with_columns(pl.Series("depth_pre", a_depth), pl.Series("seg", a_seg))
     return out, anc
 
@@ -543,7 +669,9 @@ def window_flows(
     orders = orders.with_columns(
         pl.when(pl.col("id").is_in(takers.implode()))
         .then(None)
-        .otherwise(pl.col("px").shift(1).over("id"))
+        .otherwise(
+            pl.col("prev_px") if "prev_px" in ev.columns else pl.col("px").shift(1).over("id")
+        )
         .alias("prev_px")
     )
     orders = orders.join(last_fill, on="id", how="left").with_columns(
@@ -788,7 +916,7 @@ def run_l3(
 
     rng = np.random.default_rng(seed)
     since_us, until_us = parse_utc(since), parse_utc(until)
-    ev = load_events(raw_root, cache_root, until_us=until_us)
+    ev = load_events(raw_root, cache_root, until_us=until_us).drop("seq")  # only for ordering
     snaps = load_snapshots(raw_root)
     if until_us is not None:
         snaps = [s for s in snaps if s.recv_us < until_us]
@@ -797,8 +925,9 @@ def run_l3(
     takers = find_sweeps(trades, min_levels=2, isolate_ms=0)
     if since_us is not None:
         sweeps = sweeps.filter(pl.col("t_first") >= since_us)
-    r0, _ = replay(ev, snaps)
-    plac = placebo_times(r0, takers, n=placebo_per_sweep * len(sweeps), seed=seed)
+    plac = placebo_times(
+        segment_spans(ev, snaps), takers, n=placebo_per_sweep * len(sweeps), seed=seed
+    )
     if since_us is not None:
         plac = plac.filter(pl.col("t_first") >= since_us)
     anchors = (
@@ -813,7 +942,13 @@ def run_l3(
         .with_row_index("aid")
         .with_columns(pl.col("aid").cast(pl.Int64), (pl.col("t_first") - 1000).alias("t_pre"))
     )
-    rep, anc = replay(ev, snaps, anchors)
+    flow_window_ms = (-200, 3400)
+    rep, anc = replay(ev, snaps, anchors, keep_ms=flow_window_ms)
+    # the full event frame is no longer needed: keep the summary figures, free the rest
+    hours = (ev["t_us"].max() - ev["t_us"].min()) / 3.6e9  # type: ignore[operator]
+    n_ord = int((ev["ev"] != EV_TRADE).sum())
+    recv_lo, recv_hi = int(ev["recv_us"].min()), int(ev["recv_us"].max())  # type: ignore[arg-type]
+    del ev
     anc = anc.filter((pl.col("seg") >= 0) & pl.col("depth_pre").is_not_nan()).sort("aid")
     anc = anchor_covariates(trades, anc).rename({"depth_pre": "depth_pre_swept"})
     s_cov, p_cov = anc.filter(pl.col("is_sweep") == 1), anc.filter(pl.col("is_sweep") == 0)
@@ -822,7 +957,7 @@ def run_l3(
         [s_cov.with_columns(pl.lit(1.0).alias("w")), p_cov.drop("sweep_coverage")],
         how="diagonal_relaxed",
     ).sort("aid")
-    flows = window_flows(rep, anc, window_ms=(-200, 3400))
+    flows = window_flows(rep, anc, window_ms=flow_window_ms)
     early = flows.filter(pl.col("dt_ms") < 1000)
     moves = move_flags(early, near_bps=near_bps, lag_ms=lag_ms, pool=flows)
 
@@ -908,15 +1043,12 @@ def run_l3(
         lo, hi = _ci(d)
         return f"{fmt(e[j])} [{fmt(lo[j])}, {fmt(hi[j])}]"
 
-    hours = (ev["t_us"].max() - ev["t_us"].min()) / 3.6e9  # type: ignore[operator]
-    n_ord = int(ev.filter(pl.col("ev") != EV_TRADE).height)
     kl = [f"{a}-{b}" for a, b in zip(KAPPA_BINS[:-1], KAPPA_BINS[1:], strict=True)]
     ml = [f"{a}-{b}" for a, b in zip(mbins[:-1], mbins[1:], strict=True)] + list(pooled)
     lines = [
         "# Bitstamp BTC/USD order-level (L3) replication",
         "",
-        f"Window (receive time, UTC): {_utc(int(ev['recv_us'].min()))} to "  # type: ignore[arg-type]
-        f"{_utc(int(ev['recv_us'].max()))}"  # type: ignore[arg-type]
+        f"Window (receive time, UTC): {_utc(recv_lo)} to {_utc(recv_hi)}"
         + (f" (since={since}, until={until})" if since or until else "")
         + ".",
         "",
