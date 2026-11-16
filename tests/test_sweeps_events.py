@@ -1,9 +1,11 @@
+from pathlib import Path
+
 import numpy as np
 import polars as pl
 import pytest
 
 from lobflow.convert import infer_tick_size
-from lobflow.events import PanelParams, build_event_panel
+from lobflow.events import PanelParams, build_event_panel, load_book_arrays, read_book_arrays
 from lobflow.sweeps import SweepParams, detect_sweeps
 from lobflow.tardis import DatasetSpec, first_days
 
@@ -152,3 +154,25 @@ def test_infer_tick_ignores_rare_off_grid_prices() -> None:
     stray = np.array([43_000.01, 43_123.47])  # two updates one cent off the 0.1 grid
     assert infer_tick_size(np.concatenate([on_grid, stray])) == pytest.approx(0.1)
     assert infer_tick_size(np.round(20_000 + rng.integers(0, 4000, 50_000) * 0.5, 1)) == 0.5
+
+
+def test_read_book_arrays_matches_load(tmp_path: Path) -> None:
+    """The lean parquet reader returns the same replay arrays as load_book_arrays, for sorted
+    and unsorted (stable-sorted) input."""
+    book = pl.DataFrame(
+        {
+            "timestamp": [3, 1, 1, 2, 5],
+            "local_timestamp": [4, 2, 2, 3, 6],
+            "is_snapshot": [False, True, True, False, False],
+            "side": ["ask", "bid", "ask", "bid", "ask"],
+            "price": [101.0, 99.0, 100.0, 99.5, 100.5],
+            "amount": [1.0, 2.0, 3.0, 0.0, 4.0],
+        }
+    )
+    for name, df in (("unsorted", book), ("sorted", book.sort("timestamp", maintain_order=True))):
+        f = tmp_path / f"{name}.parquet"
+        df.write_parquet(f)
+        want, got = load_book_arrays(df), read_book_arrays(f)
+        assert want.keys() == got.keys()
+        for k in want:
+            np.testing.assert_array_equal(want[k], got[k])

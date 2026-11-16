@@ -11,7 +11,13 @@ import numpy as np
 import polars as pl
 
 from lobflow.convert import infer_tick_size
-from lobflow.events import DEFAULT_TAUS_MS, PanelParams, build_event_panel, load_book_arrays
+from lobflow.events import (
+    DEFAULT_TAUS_MS,
+    PanelParams,
+    build_event_panel,
+    load_book_arrays,
+    read_book_arrays,
+)
 from lobflow.flows import DEFAULT_EDGES_MS, flow_panel
 from lobflow.profiles import placebo_times, profile_panel
 from lobflow.state import state_covariates
@@ -107,12 +113,11 @@ def process_flows_day(
     if not ev_path.exists():
         return {"n_events": 0, "n_placebo": 0}
     root = parquet_root / exchange
-    book = pl.read_parquet(root / "incremental_book_L2" / symbol / f"{day}.parquet")
+    arrays = read_book_arrays(root / "incremental_book_L2" / symbol / f"{day}.parquet")
     trades = pl.read_parquet(root / "trades" / symbol / f"{day}.parquet").sort(
         "timestamp", maintain_order=True
     )
     tk = float(meta["tick"])
-    arrays = load_book_arrays(book, "exchange")
     sp = SweepParams(**meta["sweep_params"])
     runs = detect_sweeps(trades, tk, sp)
     ev = pl.read_parquet(ev_path).sort("event_id")
@@ -181,12 +186,11 @@ def process_moves_day(
     if not ev_path.exists():
         return {"n_events": 0, "n_placebo": 0}
     root = parquet_root / exchange
-    book = pl.read_parquet(root / "incremental_book_L2" / symbol / f"{day}.parquet")
+    arrays = read_book_arrays(root / "incremental_book_L2" / symbol / f"{day}.parquet")
     trades = pl.read_parquet(root / "trades" / symbol / f"{day}.parquet").sort(
         "timestamp", maintain_order=True
     )
     tk = float(meta["tick"])
-    arrays = load_book_arrays(book, "exchange")
     runs = detect_sweeps(trades, tk, SweepParams(**meta["sweep_params"]))
     ev = pl.read_parquet(ev_path).sort("event_id")
     tr = (
@@ -335,6 +339,7 @@ def process_day(
         return meta
 
     arrays = load_book_arrays(book, "exchange")
+    del book  # the replay arrays hold everything needed from here on
     pp = PanelParams(taus_ms=taus_ms, confirm_tau_ms=taus_ms[0])
     events, panel = build_event_panel(arrays, sweeps, tk, pp)
     events = events.with_columns(pl.lit(tk).alias("tick"), pl.lit(day).alias("day"))

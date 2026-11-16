@@ -59,9 +59,13 @@ def snapshot_depth(is_snapshot: npt.NDArray[np.bool_], is_bid: npt.NDArray[np.bo
     """Levels per side in the largest snapshot (max over runs of snapshot rows and sides)."""
     if not is_snapshot.any():
         return 0
-    snap = is_snapshot.astype(np.int8)
-    starts = np.flatnonzero(np.diff(np.concatenate([[0], snap])) == 1)
-    ends = np.flatnonzero(np.diff(np.concatenate([snap, [0]])) == -1) + 1
+    snap = np.asarray(is_snapshot, dtype=np.bool_)
+    starts = np.flatnonzero(snap[1:] & ~snap[:-1]) + 1
+    ends = np.flatnonzero(snap[:-1] & ~snap[1:]) + 1
+    if snap[0]:
+        starts = np.concatenate([[0], starts])
+    if snap[-1]:
+        ends = np.concatenate([ends, [snap.shape[0]]])
     best = 0
     for a, b in zip(starts, ends, strict=True):
         n_bid = int(is_bid[a:b].sum())

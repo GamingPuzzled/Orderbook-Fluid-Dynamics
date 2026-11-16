@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -61,6 +62,48 @@ def load_book_arrays(
         "price": b["price"].to_numpy(),
         "amount": b["amount"].to_numpy(),
     }
+
+
+def read_book_arrays(
+    path: Path,
+    clock: Literal["exchange", "local"] = "exchange",
+    *,
+    chunk: int = 10_000_000,
+) -> dict[str, np.ndarray]:
+    """Replay arrays straight from a book parquet file, as :func:`load_book_arrays` returns.
+
+    Memory-lean for full-depth feeds (100M+ rows per day): fills preallocated arrays slice by
+    slice, reading only the five needed columns and turning ``side`` into a boolean per slice,
+    so peak memory is the arrays plus one slice (a whole-file read followed by ``to_numpy``
+    holds the table and a copy of it). Sorts (stably) only if the clock column is not already
+    non-decreasing.
+    """
+    col = CLOCK_COLUMNS[clock][0]
+    lf = pl.scan_parquet(path).select(
+        pl.col(col).alias("ts"),
+        "is_snapshot",
+        (pl.col("side") == "bid").alias("is_bid"),
+        "price",
+        "amount",
+    )
+    n = int(pl.scan_parquet(path).select(pl.len()).collect().item())
+    ts = np.empty(n, dtype=np.int64)
+    arrays: dict[str, np.ndarray] = {
+        "ts": ts,
+        "is_snapshot": np.empty(n, dtype=np.bool_),
+        "is_bid": np.empty(n, dtype=np.bool_),
+        "price": np.empty(n, dtype=np.float64),
+        "amount": np.empty(n, dtype=np.float64),
+    }
+    for a in range(0, n, chunk):
+        part = lf.slice(a, chunk).collect()
+        for c, arr in arrays.items():
+            arr[a : a + part.height] = part[c].to_numpy()
+    if n > 1 and bool((ts[1:] < ts[:-1]).any()):
+        order = np.argsort(ts, kind="stable")
+        for c in arrays:
+            arrays[c] = arrays[c][order]
+    return arrays
 
 
 def _depth_on_grid(

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import heapq
 from dataclasses import dataclass
+from typing import Any, cast
 
 import numba as nb
 import numpy as np
@@ -21,6 +22,7 @@ import polars as pl
 F64 = npt.NDArray[np.float64]
 I64 = npt.NDArray[np.int64]
 B = npt.NDArray[np.bool_]
+Idx = npt.NDArray[np.integer[Any]]  # price-level index (int32 or int64)
 
 
 @dataclass(frozen=True)
@@ -68,7 +70,7 @@ def sample_book_reference(
     n = local_ts.shape[0]
     if not (is_snapshot.shape[0] == is_bid.shape[0] == price.shape[0] == amount.shape[0] == n):
         raise ValueError("update arrays must have equal length")
-    if n and np.any(np.diff(local_ts) < 0):
+    if n and bool((local_ts[1:] < local_ts[:-1]).any()):
         raise ValueError("local_ts must be non-decreasing")
 
     order = np.argsort(query_ts, kind="stable")
@@ -154,7 +156,7 @@ def sample_book(
     query_ts: I64,
     n_levels: int = 50,
     *,
-    price_index: tuple[F64, I64] | None = None,
+    price_index: tuple[F64, Idx] | None = None,
 ) -> BookSamples:
     """Replay updates and record the top ``n_levels`` per side as of each query time.
 
@@ -169,7 +171,7 @@ def sample_book(
     n = local_ts.shape[0]
     if not (is_snapshot.shape[0] == is_bid.shape[0] == price.shape[0] == amount.shape[0] == n):
         raise ValueError("update arrays must have equal length")
-    if n and np.any(np.diff(local_ts) < 0):
+    if n and bool((local_ts[1:] < local_ts[:-1]).any()):
         raise ValueError("local_ts must be non-decreasing")
     order = np.argsort(query_ts, kind="stable")
     q_sorted = np.ascontiguousarray(query_ts[order], dtype=np.int64)
@@ -178,7 +180,7 @@ def sample_book(
         np.ascontiguousarray(local_ts, dtype=np.int64),
         np.ascontiguousarray(is_snapshot, dtype=np.bool_),
         np.ascontiguousarray(is_bid, dtype=np.bool_),
-        np.ascontiguousarray(k_idx, dtype=np.int64),
+        cast(Idx, np.ascontiguousarray(k_idx)),
         np.ascontiguousarray(amount, dtype=np.float64),
         np.ascontiguousarray(levels, dtype=np.float64),
         q_sorted,
@@ -197,13 +199,20 @@ def sample_book(
     )
 
 
-def build_price_index(price: F64) -> tuple[F64, I64]:
-    """Sorted distinct prices and each row's index into them (multithreaded via polars)."""
+def build_price_index(price: F64, *, chunk: int = 10_000_000) -> tuple[F64, Idx]:
+    """Sorted distinct prices and each row's index into them.
+
+    The index is int32 when the number of distinct prices allows (always, in practice) and is
+    filled chunk by chunk with a binary search, so a 100M-row day needs no full-length sort or
+    int64 temporary.
+    """
     if price.shape[0] == 0:
-        return np.zeros(0), np.zeros(0, dtype=np.int64)
-    sr = pl.Series("p", price)
-    k_idx = (sr.rank("dense") - 1).to_numpy().astype(np.int64)
-    levels = sr.unique().sort().to_numpy().astype(np.float64)
+        return np.zeros(0), np.zeros(0, dtype=np.int32)
+    levels = pl.Series("p", price).unique().sort().to_numpy().astype(np.float64)
+    dtype = np.int32 if levels.shape[0] < np.iinfo(np.int32).max else np.int64
+    k_idx: Idx = np.empty(price.shape[0], dtype=dtype)
+    for a in range(0, price.shape[0], chunk):
+        k_idx[a : a + chunk] = np.searchsorted(levels, price[a : a + chunk])
     return levels, k_idx
 
 
@@ -233,7 +242,7 @@ def _replay_kernel(
     ts: I64,
     snap: B,
     is_bid: B,
-    k_idx: I64,
+    k_idx: Idx,
     amount: F64,
     levels: F64,
     q: I64,
