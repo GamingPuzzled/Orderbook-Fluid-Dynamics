@@ -113,15 +113,15 @@ delayed source also appear on three thinner Bybit books with large ticks (SOL, X
 on the Binance and OKX BTC perpetuals, but repositioning appears only on the small-tick books.
 Its measured size depends on how often the venue publishes the book: on OKX's 10\,ms feed it is
 as large as on Bybit's 20\,ms feed, Binance's 52\,ms feed shows much less, and bundling the OKX
-and Bybit messages into 52\,ms batches brings both close to Binance. On BTC and ETH most moved
+and Bybit messages into 52\,ms batches brings both close to Binance (Section~\ref{sec:venues}).
+On BTC and ETH most moved
 liquidity travels less than 1--2\,bp, which
 on XRP and LINK lies inside the near zone; on SOL, where the grid is fine enough to see such
 moves, repositioning is an order of magnitude smaller; and on the large-tick books the excess
-execution cost decays far more slowly (Section~\ref{sec:robust}). This fits a queue-priority
+execution cost decays far more slowly (Section~\ref{sec:assets}). This fits a queue-priority
 explanation: where the tick is large, a place in the queue is valuable and re-posting gives it
 up, and near-touch orders on the large-tick books are cancelled two to six times more slowly
-even in normal times. The
-best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
+even in normal times (Section~\ref{sec:tick}). The best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
 2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
 
 \paragraph{Contribution.} \citet{bonart2017latency} show that net order flow at the best
@@ -147,6 +147,74 @@ and we use a public order-level feed from a second venue to show that cancel-and
 are a routine part of near-touch liquidity supply.
 
 %----------------------------------------------------------------------------------------------
+\section{Related literature}
+
+\paragraph{Resilience.} Empirical work on order book resilience measures how fast spreads and
+depth recover after aggressive orders. \citet{large2007resiliency} estimates a
+multivariate point process for Barclays shares on the London Stock Exchange; as summarised by
+\citet{xu2017resiliency}, the book fails to replenish reliably after a large trade in over 60\%
+of cases, and replenishes with a half-life of around 20 seconds when it does.
+\citet{degryse2005aggressive} study the aftermath of aggressive orders on the Paris Bourse; \citet{xu2017resiliency} find, for Chinese stocks, that spread
+and depth at the best quotes recover within about 20 best-limit updates; and
+\citet{clapham2021speed} show that high-frequency traders restore the spread within seconds,
+whereas depth is rebuilt more slowly and mostly by other participants.
+\citet{lo2015resiliency} estimate impulse responses of depth at several levels and find weaker
+recovery away from the best quotes. These studies characterise \emph{how fast} liquidity
+returns, at the best quotes or in aggregate. We ask \emph{where it comes from}: whether
+near-touch depth is new or moved from deeper in the book. In optimal execution, resilience
+enters as an exponential \citep{obizhaeva2013optimal} or more general \citep{alfonsi2010optimal}
+relaxation of a single deficit; our results suggest that this deficit has internal structure
+on sub-second horizons.
+
+\paragraph{Continuum and SPDE models.} The latent order book of \citet{donier2015minimal} and
+\citet{mastromatteo2014anomalous} treats buy and sell intentions as densities that diffuse,
+react and are injected, which yields square-root impact. \citet{benzaquen2018fractional}
+replace ordinary diffusion with a fractional, non-local operator, and \citet{diana2024anomalous}
+simulate order books with anomalous diffusion of orders. \citet{cont2021spde} model the observed book density
+as a stochastic PDE around the mid price and calibrate it to the average profile, and
+\citet{hambly2024porous} study a stochastic porous-medium equation motivated by the order book.
+\citet{mahseredjian2025migration} derives a diffusion limit of a Hawkes-driven book in which
+liquidity migrates between neighbouring price levels, so that the limit contains a local
+diffusion term; our out-of-sample fits find no role for such a term after sweeps on the
+small-tick BTC and ETH books, but do on large-tick books.
+To our knowledge these models have not been confronted with the conditional, post-shock
+dynamics of the depth profile. Our evidence supports their non-local variants over local
+diffusion at the horizons we study.
+
+\paragraph{Order flow as point processes.} Hawkes and queue-reactive models describe order
+arrivals and cancellations as self- and cross-exciting
+\citep{bacry2015hawkes,rambaldi2017volume,lu2018highdim} or as functions of queue sizes
+\citep{huang2015queue}. They usually model event timing at the best limits or a few levels.
+Our decomposition is complementary: it measures where in the depth profile cancellations and
+additions occur after a shock, which constrains how such models should couple levels. In
+Section~\ref{sec:param}, a linear-Hawkes response reproduces the two post-sweep time scales,
+while a queue-reactive benchmark, in which flows depend only on queue sizes, fails.
+
+\paragraph{Order flow around market orders.} \citet{bonart2017latency} study net order flow at
+the best quotes of five Nasdaq stocks before and after market orders and identify a sequence
+of phases: platform and response latency, a high-speed reaction with net outflow at the
+same-side best quote, and then net inflow consistent with stimulated refill.
+\citet{bechler2017meso} document episodes in which market orders under one-sided flow are met
+by net cancellations at the touch rather than new limit orders (``LOB fade''). Our withdrawal and source phases extend these
+best-quote patterns through the depth profile; the intermediate reallocation from deep to near
+levels has, to our knowledge, not been measured.
+
+\paragraph{Cancellations, quote fade and placement.} \citet{hasbrouck2009fleeting} document
+that a large share of limit orders are cancelled within seconds. \citet{MalinovaPark2016} show
+with trader-level data that high-frequency market makers cancel quotes within milliseconds of
+a trade (``quote fade''). Our withdrawal phase is a multi-level analogue of this behaviour.
+\citet{ponzi2006crises} find that after temporary liquidity crises new orders are placed inside
+the spread, the closest equity precedent for our repositioning phase; our contribution is to
+separate repositioning from new liquidity through a mass balance and to order the phases in
+time.
+
+\paragraph{Crypto perpetual futures.} \citet{albers2025dilemma} run a live market-making
+experiment on the Binance Bitcoin perpetual and document a trade-off between fill probability
+and post-fill returns that depends on queue position. Crypto venues
+publish full-depth incremental feeds with aggressor flags, which make the decomposition here
+feasible without order identifiers.
+
+%----------------------------------------------------------------------------------------------
 \section{Data}
 
 \paragraph{Source.} Tardis.dev publishes the first day of every month of its historical
@@ -162,11 +230,11 @@ streams on the exchange clock rather than on receipt time.
 
 \paragraph{Sample.} The main sample is 42 days (BTCUSDT) and 43 days (ETHUSDT) from May 2023 to
 October 2026 (BTCUSDT) and November 2026 (ETHUSDT). Table~\ref{tab:sample} summarises it.
-For replication (Section~\ref{sec:robust}) we add the Bybit SOLUSDT, XRPUSDT and LINKUSDT
+For replication (Section~\ref{sec:general}) we add the Bybit SOLUSDT, XRPUSDT and LINKUSDT
 perpetuals on the same first-of-month days and with the same feed filter (31, 21 and 25 days
 with matched placebo times), and the Binance BTCUSDT and OKX BTC-USDT-SWAP perpetuals on the same
 twelve quarterly days (Binance's feed publishes about 1{,}000 levels every 52\,ms, OKX's
-tick-by-tick feed 400 levels every 10\,ms; see Section~\ref{sec:robust}).
+tick-by-tick feed 400 levels every 10\,ms; see Section~\ref{sec:venues}).
 
 \begin{table}[ht]
 \centering
@@ -563,79 +631,11 @@ non-local jump only weakly, because a jump and a near-touch source both add mass
 separating them requires the flow decomposition of Section~\ref{sec:results}. The two kinds of
 evidence agree: for BTC and ETH there is no local diffusion component at these horizons, and
 the near-touch rebuild comes from non-local reallocation and a source. On the large-tick books
-of Section~\ref{sec:robust} a local term does help, because the same short displacement spans
+of Section~\ref{sec:assets} a local term does help, because the same short displacement spans
 only one or two ticks there.
 
 %----------------------------------------------------------------------------------------------
-\section{Related literature}
-
-\paragraph{Resilience.} Empirical work on order book resilience measures how fast spreads and
-depth recover after aggressive orders. \citet{large2007resiliency} estimates a
-multivariate point process for Barclays shares on the London Stock Exchange; as summarised by
-\citet{xu2017resiliency}, the book fails to replenish reliably after a large trade in over 60\%
-of cases, and replenishes with a half-life of around 20 seconds when it does.
-\citet{degryse2005aggressive} study the aftermath of aggressive orders on the Paris Bourse; \citet{xu2017resiliency} find, for Chinese stocks, that spread
-and depth at the best quotes recover within about 20 best-limit updates; and
-\citet{clapham2021speed} show that high-frequency traders restore the spread within seconds,
-whereas depth is rebuilt more slowly and mostly by other participants.
-\citet{lo2015resiliency} estimate impulse responses of depth at several levels and find weaker
-recovery away from the best quotes. These studies characterise \emph{how fast} liquidity
-returns, at the best quotes or in aggregate. We ask \emph{where it comes from}: whether
-near-touch depth is new or moved from deeper in the book. In optimal execution, resilience
-enters as an exponential \citep{obizhaeva2013optimal} or more general \citep{alfonsi2010optimal}
-relaxation of a single deficit; our results suggest that this deficit has internal structure
-on sub-second horizons.
-
-\paragraph{Continuum and SPDE models.} The latent order book of \citet{donier2015minimal} and
-\citet{mastromatteo2014anomalous} treats buy and sell intentions as densities that diffuse,
-react and are injected, which yields square-root impact. \citet{benzaquen2018fractional}
-replace ordinary diffusion with a fractional, non-local operator, and \citet{diana2024anomalous}
-simulate order books with anomalous diffusion of orders. \citet{cont2021spde} model the observed book density
-as a stochastic PDE around the mid price and calibrate it to the average profile, and
-\citet{hambly2024porous} study a stochastic porous-medium equation motivated by the order book.
-\citet{mahseredjian2025migration} derives a diffusion limit of a Hawkes-driven book in which
-liquidity migrates between neighbouring price levels, so that the limit contains a local
-diffusion term; our out-of-sample fits find no role for such a term after sweeps on the
-small-tick BTC and ETH books, but do on large-tick books.
-To our knowledge these models have not been confronted with the conditional, post-shock
-dynamics of the depth profile. Our evidence supports their non-local variants over local
-diffusion at the horizons we study.
-
-\paragraph{Order flow as point processes.} Hawkes and queue-reactive models describe order
-arrivals and cancellations as self- and cross-exciting
-\citep{bacry2015hawkes,rambaldi2017volume,lu2018highdim} or as functions of queue sizes
-\citep{huang2015queue}. They usually model event timing at the best limits or a few levels.
-Our decomposition is complementary: it measures where in the depth profile cancellations and
-additions occur after a shock, which constrains how such models should couple levels. In
-Section~\ref{sec:param}, a linear-Hawkes response reproduces the two post-sweep time scales,
-while a queue-reactive benchmark, in which flows depend only on queue sizes, fails.
-
-\paragraph{Order flow around market orders.} \citet{bonart2017latency} study net order flow at
-the best quotes of five Nasdaq stocks before and after market orders and identify a sequence
-of phases: platform and response latency, a high-speed reaction with net outflow at the
-same-side best quote, and then net inflow consistent with stimulated refill.
-\citet{bechler2017meso} document episodes in which market orders under one-sided flow are met
-by net cancellations at the touch rather than new limit orders (``LOB fade''). Our withdrawal and source phases extend these
-best-quote patterns through the depth profile; the intermediate reallocation from deep to near
-levels has, to our knowledge, not been measured.
-
-\paragraph{Cancellations, quote fade and placement.} \citet{hasbrouck2009fleeting} document
-that a large share of limit orders are cancelled within seconds. \citet{MalinovaPark2016} show
-with trader-level data that high-frequency market makers cancel quotes within milliseconds of
-a trade (``quote fade''). Our withdrawal phase is a multi-level analogue of this behaviour.
-\citet{ponzi2006crises} find that after temporary liquidity crises new orders are placed inside
-the spread, the closest equity precedent for our repositioning phase; our contribution is to
-separate repositioning from new liquidity through a mass balance and to order the phases in
-time.
-
-\paragraph{Crypto perpetual futures.} \citet{albers2025dilemma} run a live market-making
-experiment on the Binance Bitcoin perpetual and document a trade-off between fill probability
-and post-fill returns that depends on queue position. Crypto venues
-publish full-depth incremental feeds with aggressor flags, which make the decomposition here
-feasible without order identifiers.
-
-%----------------------------------------------------------------------------------------------
-\section{Robustness and limitations}
+\section{Robustness}
 \label{sec:robust}
 
 Table~\ref{tab:robust} repeats the analysis on subsets of sweeps. For each subset, placebo
@@ -661,13 +661,19 @@ grid; 95\% day-cluster bootstrap intervals (100 replications) in brackets.}
 \resizebox{\textwidth}{!}{\input{tables/robustness.tex}}
 \end{table}
 
+%----------------------------------------------------------------------------------------------
+\section{Other assets and venues}
+\label{sec:general}
+
 Table~\ref{tab:cross} and Figure~\ref{fig:cross} collect the headline statistics for every
 asset and venue in the sample: early net depletion ($\kappa_{20\text{--}40}<1$), the
 repositioning share, the three phase centroids, the switch to net new liquidity, the gain in
 out-of-sample $R^2$ from adding local diffusion, and the share of the follow-up execution
 excess left at 250\,ms.
 
-\paragraph{Other assets.} We repeat the full pipeline on the Bybit SOLUSDT, XRPUSDT and
+\subsection{Other assets}
+\label{sec:assets}
+We repeat the full pipeline on the Bybit SOLUSDT, XRPUSDT and
 LINKUSDT perpetuals over the same first-of-month days (4{,}084, 1{,}060 and 768 sweeps). These
 books are thinner, and their tick is large relative to price: a median of 0.10, 0.47 and
 0.59\,bp of the mid, against 0.014\,bp for BTC and 0.040\,bp for ETH. Two of the three phases
@@ -706,7 +712,9 @@ fast recovery of execution cost, is therefore a feature of the deep, small-tick 
 books; withdrawal, early net depletion and a delayed source of new liquidity are common to
 all five.
 
-\paragraph{Other venues.} The Binance BTCUSDT and OKX BTC-USDT-SWAP perpetuals have nearly the
+\subsection{Other venues and feed speed}
+\label{sec:venues}
+The Binance BTCUSDT and OKX BTC-USDT-SWAP perpetuals have nearly the
 same relative tick as Bybit BTCUSDT (0.013 against 0.014\,bp) but different participants, so
 they separate the tick from the venue. They also differ in how often the book is published,
 which turns out to matter: Binance's free Tardis feed publishes about 1{,}000 levels every
@@ -760,7 +768,9 @@ Bybit with messages netted into 52\,ms buckets. NN placebo; 95\% day-cluster int
 \input{tables/feedspeed.tex}
 \end{table}
 
-\paragraph{Why the tick matters.} On a book whose tick is large relative to price, queues at
+\subsection{Why the tick matters}
+\label{sec:tick}
+On a book whose tick is large relative to price, queues at
 each price are long and an order's place in the queue is valuable: \citet{moallemi2016queue}
 estimate that queue position in large-tick stocks is worth about as much as the bid--ask
 spread, and \citet{yao2018speed} show that a larger relative tick lengthens queues and makes
@@ -816,6 +826,10 @@ Repositioning is clearly positive only on the four small-tick books; Binance's 5
 most of it there.}
 \label{fig:cross}
 \end{figure}
+
+%----------------------------------------------------------------------------------------------
+\section{Limitations}
+\label{sec:limits}
 
 \begin{itemize}
   \item \textbf{Level-2 data.} Without order identifiers we cannot show that the \emph{same}
