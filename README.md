@@ -66,7 +66,7 @@ uv run python scripts/feedspeed.py                               # feed-speed co
 Bitstamp order-level replication (frozen sample used in the paper):
 
 ```bash
-uv run lobflow l3 --pair btcusd --n-boot 300 --until 2026-11-10T16:00
+uv run lobflow l3 --pair btcusd --n-boot 300 --until 2026-11-16T00:00
 ```
 
 Paper tables and figures (written to `paper/tables/`, `figures/` and `paper/figures/`):

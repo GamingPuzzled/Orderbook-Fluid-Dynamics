@@ -94,9 +94,9 @@ three phases:
         cancelled depth on the swept side is 0.61--0.73 at 20--40\,ms, against 1.0--1.05 at
         matched placebo times. The match is in aggregate flows. In the 20\,ms level-2 feed,
         exact-size tracing links only about 1\% of near-touch additions to deeper
-        cancellations, but this reflects netting: in a preliminary order-level sample from
-        Bitstamp, exact-amount cancel-and-repost moves supply about a quarter of near-touch
-        added volume.
+        cancellations, but this reflects netting: in a week of order-level data from Bitstamp,
+        exact-amount cancel-and-repost moves supply more than a quarter of near-touch added
+        volume, as much at ordinary times as after sweeps.
   \item \textbf{Source} (mean $\approx$ 0.4--0.8\,s): after roughly 140\,ms (ETH) to
         140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
         cancellations (ratio 1.09--1.12 against 1.03--1.04): genuinely new liquidity arrives.
@@ -496,22 +496,31 @@ price, which hides moves at busy levels, and post-sweep levels are the busiest. 
 interpret repositioning as a depth-conserving reallocation in aggregate flows.
 
 Order-level data show that the low Bybit match rate reflects netting rather than the absence of
-moves. In a preliminary 7.2-hour sample of Bitstamp's public BTC/USD order feed (10 November
-2026, 08:50--16:00 UTC; 7.5 million order events, each with its own identifier and millisecond timestamp, so nothing is netted),
-resting orders are never re-priced in place: price changes in \texttt{order\_changed} events
-occur only for aggressive orders as they fill. A moved order therefore appears as a
+moves. We recorded Bitstamp's public BTC/USD order feed for 135 hours (10 November 2026,
+08:50 UTC, to 16 November, 00:00 UTC; 131 million order events, each with its own identifier
+and microsecond timestamp, so nothing is netted), giving 3{,}014 isolated sweeps and 60{,}280
+placebo times matched on the same covariates as for Bybit (standardised differences at most
+0.08). Resting orders are never re-priced in place: price changes in \texttt{order\_changed}
+events occur only for aggressive orders as they fill. A moved order therefore appears as a
 cancellation followed by a new order, whose amount is exact to the satoshi. Within 1\,bp of the
-opposite quote, 44\% of added volume in the second after a sweep (38\% at state-matched
-placebo times) has a cancellation of the identical amount at a strictly deeper price within
-100\,ms. A one-satoshi-off control matches almost nothing, and a control that repeats the rule
-against cancellations 2\,s later, which absorbs market makers' habit of reusing quote sizes,
-removes about half; the remaining 25\% (95\% CI 21--30\%) after sweeps and 24\% (20--28\%)
-at placebo times are cancel-and-repost moves toward the touch. Moving existing orders is
-therefore a routine way of supplying near-touch liquidity, not a rare event. With only 166
-sweeps, and placebo matching that remains imperfect (standardised differences up to 0.25), this
-sample cannot yet say whether moves intensify after sweeps, and the post-sweep dip in additions
-relative to cancellations is below one but not significant ($\kappa_{20\text{--}40}=0.87$,
-CI 0.70--1.12). \todo{Update with the full Bitstamp sample.}
+opposite quote, 47\% of added volume in the second after a sweep (47\% at placebo times) has a
+cancellation of the identical amount at a strictly deeper price within 100\,ms. A
+one-satoshi-off control matches almost nothing, and a control that repeats the rule against
+cancellations 2\,s later, which absorbs market makers' habit of reusing quote sizes, removes
+about two fifths; the remaining 28\% (95\% CI 26--29\%) after sweeps and 30\% (28--32\%) at
+placebo times are cancel-and-repost moves toward the touch. Moving existing orders is
+therefore a routine way of supplying near-touch liquidity, not a rare event, and sweeps do not
+make it more frequent: the difference between sweeps and placebo times is $+1.2$ percentage
+points ($[-2.0, 5.0]$) at 20--250\,ms and $-2.5$ ($[-5.0, -0.2]$) over the whole second.
+What sweeps change is the balance of flows. Additions per cancellation on the swept side fall
+to 0.99 ($[0.93, 1.04]$) at 20--40\,ms and 0.94 ($[0.87, 1.00]$) at 40--60\,ms, against 1.20
+($[1.07, 1.32]$) and 1.13 ($[0.99, 1.27]$) at placebo times, and recover to the placebo level
+from 60\,ms on. Bitstamp thus differs from the three BTC perpetuals: cancel-and-repost moves
+toward the touch are common, but they run at their ordinary rate after a sweep rather than in
+an extra burst, and the aggregate split of Section~\ref{sec:results}, with the near zone at
+1\,bp, attributes only 0.006 ($[0.004, 0.009]$) of pre-sweep depth to excess repositioning.
+Whether this reflects the spot venue, its participants or its very small tick (0.01\,USD, about
+0.001\,bp) we cannot tell from one book.
 
 \subsection{What a follow-up order pays}
 \label{sec:exec}
@@ -835,9 +844,9 @@ most of it there.}
   \item \textbf{Level-2 data.} Without order identifiers we cannot show that the \emph{same}
         orders move; repositioning is identified from matched aggregate cancellation and
         addition flows. Bitstamp's order-level feed shows that exact-amount cancel-and-repost
-        moves supply about a quarter of near-touch added volume, but that sample is short
-        (7.2 hours, 166 sweeps), on a spot venue, and its placebo matching is imperfect
-        (standardised differences up to 0.25).
+        moves supply more than a quarter of near-touch added volume, but that sample covers
+        one spot venue over six days (3{,}014 sweeps), and the cancel-and-repost link is
+        inferred from identical amounts rather than from a shared order identifier.
   \item \textbf{Push netting.} Each message nets changes over its publication interval, so
         gross flows, and repositioning in particular, are lower bounds. On OKX, netting its
         10\,ms messages into 20, 52 and 100\,ms buckets removes 42\%, 77\% and 97\% of measured

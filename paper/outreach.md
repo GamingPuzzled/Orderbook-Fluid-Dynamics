@@ -44,12 +44,13 @@ cancellations and fills, which gives a mass balance of the swept side.
    far more slowly. It also appears on OKX BTC (10 ms feed) at the same size as on Bybit; on Binance BTC (52 ms feed) it looks weaker, and bundling the OKX and Bybit messages into 52 ms batches brings both close to Binance, so the measured size depends on feed speed and the true moves are larger than measured.
 5. **Execution.** A follow-up market order pays 2–3× the normal cost 20 ms after a sweep, but
    about 90% of that excess is gone within 250 ms, during repositioning.
-6. **Order-level check (preliminary).** On Bitstamp, about a quarter of near-touch liquidity is
-   an existing order cancelled deep and re-posted near the touch with the identical amount, so
-   "moving" liquidity is routine.
+6. **Order-level check.** Over six days of Bitstamp order-level data (3,014 sweeps), more than a
+   quarter of near-touch liquidity is an existing order cancelled deep and re-posted near the
+   touch with the identical amount, as often at ordinary times as after sweeps: "moving"
+   liquidity is routine.
 
 **Status.** Full pipeline (Python, tested, public on GitHub); draft paper written; replications
-on SOL, XRP, LINK (Bybit) and 12 Binance BTC and 12 OKX BTC days done; Bitstamp order-level recording ongoing.
+on SOL, XRP, LINK (Bybit) and 12 Binance BTC and 12 OKX BTC days done; Bitstamp order-level sample (135 h) analysed.
 
 **What I'm looking for.** A faculty mentor or co-author to review the framing and help prepare
 the paper for submission (target: *Quantitative Finance*).
