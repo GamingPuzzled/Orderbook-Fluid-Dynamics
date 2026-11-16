@@ -18,31 +18,20 @@
 \maketitle
 
 \begin{abstract}
-When an aggressive order sweeps through several price levels of a limit order book, how does
-the book refill, and where does the new depth come from? Resilience models describe only the
-aggregate rate of recovery, and continuum models let liquidity diffuse between neighbouring
-prices. Using 20-millisecond level-2 data for Bybit BTC and ETH perpetual futures (85 days,
-42{,}180 isolated multi-level sweeps), we decompose every book update into additions,
-cancellations and fills, measured relative to the moving opposite quote and against placebo
-times matched on volume, volatility and depth. Refill proceeds in three phases:
-(i) \emph{withdrawal}, a multi-level quote fade from the moment of the sweep;
-(ii) \emph{repositioning}, concentrated in the first $\sim$100\,ms, in which depth cancelled
-deep in the book is re-posted near the new best quote, supplying 74--93\% of the near-touch
-rebuild while total depth on the swept side still \emph{falls} (additions/cancellations
-0.61--0.73 at 20--40\,ms against $\approx 1.0$ at placebo times); and (iii) genuinely new
-liquidity, centred at roughly 0.4--0.8\,s. A three-phase rate model and a linear-Hawkes
-response predict the flows on held-out days; exponential recovery and a queue-reactive
-benchmark, in which flows depend only on the book's state, do not; local diffusion adds no
-predictive power; and the phases are nearly the same whether or not the price later continues
-in the sweep's direction. Across seven books on three venues, withdrawal and the delayed arrival
-of new liquidity are general, but repositioning is not. It appears on all four small-tick books,
-including the OKX and Binance BTC perpetuals, with a measured size that depends on how often the
-venue publishes the book: OKX's 10\,ms feed shows as much as Bybit's 20\,ms feed, and bundling
-either into 52\,ms messages brings both close to Binance's 52\,ms feed. It is absent on SOL and
-finer than the tick grid on XRP and LINK, the three large-tick books (most repositioned BTC and
-ETH liquidity moves less than 1--2 basis points). On the Bybit BTC and ETH books, the excess
-cost of a follow-up market order falls by about 90\% within 250\,ms; on the large-tick books
-most of it remains.
+When a large market order sweeps through several price levels, it leaves a hole in the limit
+order book. How is the hole filled, and with whose orders? We follow every change to the book
+in the second after more than 42{,}000 such sweeps on the Bybit Bitcoin and Ether perpetual
+futures, using free 20-millisecond data, and compare it with similar moments when no sweep
+occurs. The book refills in three steps. Liquidity providers first pull orders across the
+book. Within about a tenth of a second, depth cancelled deep in the book reappears at the new
+best price, rebuilding the touch while total depth is still falling. Genuinely new orders
+arrive only after about half a second. Because of this middle step, most of the extra cost of
+trading again right after a sweep is gone within 250 milliseconds. Models in which liquidity
+diffuses between neighbouring prices, or in which order flow depends only on the current
+queues, miss this sequence. Pulling first and adding new orders later holds on all seven books
+we study, across three exchanges. The fast move to the new price appears only where the tick
+is small relative to the price; on large-tick books, where a place in the queue is worth
+keeping, it is absent and trading stays expensive for longer.
 \end{abstract}
 
 \noindent\textbf{Keywords:} limit order book; resilience; market making; quote fade;
@@ -52,102 +41,113 @@ cryptocurrency perpetual futures; reaction--diffusion\\
 %----------------------------------------------------------------------------------------------
 \section{Introduction}
 
-Liquidity in a limit order book is consumed in discrete shocks: a single aggressive order can
-exhaust the queues at several adjacent price levels within one matching-engine event. How the
-book subsequently refills matters for execution cost, for the price impact of the next trade,
-and for the stability of markets in which such shocks cluster.
+At 01:40:18.162 UTC on 1 March 2025, a single buy order for 3.65 bitcoin, worth about
+\$300{,}000, reached the Bybit perpetual futures book. It filled at prices spanning 73 ticks
+(\$7.30, or 0.9 basis points) and left all of those price levels empty. Sweeps like this one
+happen hundreds of times a day on every large crypto exchange. Each leaves a hole in the book,
+and whoever trades next pays for it until the hole is filled. This paper asks how the hole is
+filled: in what order, how quickly, and with whose orders.
 
-Two families of models describe this refill. Resilience models used in optimal execution
-\citep{obizhaeva2013optimal,alfonsi2010optimal,predoiu2011optimal} specify the \emph{rate} at
-which aggregate depth recovers toward a steady state, but not \emph{where} in the book the new
-depth appears. Continuum models treat the book as a density in price space evolving by
-reaction--diffusion or stochastic partial differential equations
-\citep{donier2015minimal,mastromatteo2014anomalous,cont2021spde}; in these models the diffusion
-term moves liquidity between neighbouring prices, so a cleared region refills from its edges.
-Point-process models \citep{bacry2015hawkes,lu2018highdim,huang2015queue} capture how market
-orders excite subsequent limit orders and cancellations, typically at or near the best quotes.
+Existing models answer part of this question. Resilience models used in optimal execution
+\citep{obizhaeva2013optimal,alfonsi2010optimal,predoiu2011optimal} describe how fast aggregate
+depth returns to normal, but not where in the book the new depth appears. Continuum models treat
+the book as a density over prices that evolves by reaction and diffusion
+\citep{donier2015minimal,mastromatteo2014anomalous,cont2021spde}; in them, liquidity drifts in
+from neighbouring prices, so an empty region fills from its edges. Point-process models
+\citep{bacry2015hawkes,lu2018highdim,huang2015queue} describe how a market order sets off
+further orders and cancellations, mostly at the best quotes.
 
-We ask a question that sits between these literatures: after a multi-level sweep, is the refill
-of the book \emph{local transport} of existing liquidity from adjacent levels, \emph{non-local
-repositioning} of existing liquidity, or the arrival of \emph{new} liquidity? These
-mechanisms correspond to different terms in a continuum description: a diffusion operator, a
-non-local jump kernel, and a source term.
+These views suggest three different answers. Orders could slide in from adjacent prices, as
+diffusion implies. Orders resting deeper in the book could be cancelled and re-posted at the new
+best price: a jump rather than a slide. Or traders who were not in the book at all could post
+new orders. In a continuum model these are three different terms (a diffusion operator, a
+non-local jump kernel and a source), and they have different consequences for anyone who wants
+to trade again soon after a sweep.
 
-\paragraph{Approach.} We use free first-of-month level-2 data from Bybit USDT-margined
-perpetual futures, recorded at the exchange's 20\,ms push interval with 50 levels per side
-\citep{tardis}. We identify isolated sweeps that clear at least three price levels and study the
-swept side of the book in a frame that moves with the opposite best quote, which removes the
-mechanical effect of the price relocation that accompanies every sweep. We then decompose every
-book message in the second after the sweep into additions, cancellations and fills, and compare
-against placebo times matched on recent volume, realised variation and book depth.
+\paragraph{What we do.} We use the free first-of-month files that Tardis.dev publishes for
+Bybit's BTC and ETH perpetuals \citep{tardis}: the 50 best price levels on each side, updated
+every 20\,ms, together with every trade. Over 85 days we find 42{,}180 isolated sweeps that
+clear at least three price levels. Every sweep moves the price, and in a frame fixed at the old
+price that move alone looks like refill, so we measure the book from the opposite best quote
+instead. We then split every change to the book in the following second into additions,
+cancellations and fills, and compare with random moments that resemble the sweep moments in
+recent trading volume, volatility and depth.
 
-\paragraph{Findings.} Refill is neither diffusive nor a simple replenishment. It proceeds in
-three phases:
+\paragraph{What we find.} The book refills in three overlapping steps.
 \begin{enumerate}
-  \item \textbf{Withdrawal} (from the sweep onward; window centroid $\approx$ 50--110\,ms): cancellations of deep orders that
-        are not matched by additions anywhere on the swept side. This is a multi-level version
-        of the ``quote fade'' documented for equity market makers by \citet{MalinovaPark2016}.
-  \item \textbf{Repositioning} (concentrated in the first $\sim$100\,ms, overlapping
-        withdrawal; mean $\approx$ 50\,ms in parametric fits): depth cancelled deeper in the
-        book is matched by depth posted within five ticks of the new best quote. It supplies
-        74--93\% of the near-touch rebuild in the first 250\,ms, while the ratio of added to
-        cancelled depth on the swept side is 0.61--0.73 at 20--40\,ms, against 1.0--1.05 at
-        matched placebo times. The match is in aggregate flows. In the 20\,ms level-2 feed,
-        exact-size tracing links only about 1\% of near-touch additions to deeper
-        cancellations, but this reflects netting: in a week of order-level data from Bitstamp,
-        exact-amount cancel-and-repost moves supply more than a quarter of near-touch added
-        volume, as much at ordinary times as after sweeps.
-  \item \textbf{Source} (mean $\approx$ 0.4--0.8\,s): after roughly 140\,ms (ETH) to
-        140--300\,ms (BTC), near-touch build-up exceeds deep depletion and additions exceed
-        cancellations (ratio 1.09--1.12 against 1.03--1.04): genuinely new liquidity arrives.
+  \item \textbf{Withdrawal.} From the moment of the sweep, liquidity providers cancel orders at
+        many price levels and do not replace them. This is a book-wide version of the ``quote
+        fade'' that \citet{MalinovaPark2016} document for equity market makers.
+  \item \textbf{Repositioning.} Within roughly the first 100\,ms, depth cancelled deep in the
+        book reappears within five ticks of the new best price. This supplies 74--93\% of the
+        depth rebuilt near the touch in the first 250\,ms, even though total depth on the swept
+        side is still falling: right after a sweep about two orders are added for every three
+        cancelled, against one for one at ordinary times.
+  \item \textbf{New liquidity.} Only after 140--300\,ms do additions start to outnumber
+        cancellations, and the new orders arrive on average 0.4--0.8\,s after the sweep.
 \end{enumerate}
-The structure is the same for BTC and ETH and robust to the definition of the deep book, the
-matching method, sweep size, sweep side and time of day, and a parametric three-phase model
-predicts the flows on held-out days better than exponential recovery or any model without
-repositioning or the source (Section~\ref{sec:param}). A queue-reactive benchmark, in which flows
-depend only on current queue sizes, fails out of sample, and the early phases are nearly the
-same whether or not the price later continues in the sweep's direction
-(Section~\ref{sec:info}): refill is a reaction to the sweep itself, timed from it, not a
-response to the book's state or to the sweep's information content. Withdrawal and the
-delayed source also appear on three thinner Bybit books with large ticks (SOL, XRP, LINK) and
-on the Binance and OKX BTC perpetuals, but repositioning appears only on the small-tick books.
-Its measured size depends on how often the venue publishes the book: on OKX's 10\,ms feed it is
-as large as on Bybit's 20\,ms feed, Binance's 52\,ms feed shows much less, and bundling the OKX
-and Bybit messages into 52\,ms batches brings both close to Binance (Section~\ref{sec:venues}).
-On BTC and ETH most moved
-liquidity travels less than 1--2\,bp, which
-on XRP and LINK lies inside the near zone; on SOL, where the grid is fine enough to see such
-moves, repositioning is an order of magnitude smaller; and on the large-tick books the excess
-execution cost decays far more slowly (Section~\ref{sec:assets}). This fits a queue-priority
-explanation: where the tick is large, a place in the queue is valuable and re-posting gives it
-up, and near-touch orders on the large-tick books are cancelled two to six times more slowly
-even in normal times (Section~\ref{sec:tick}). The best quote recovers 63\% (BTC) and 53\% (ETH) of its pre-sweep depth by 40\,ms, while levels
-2--10 ticks from the opposite quote briefly hold up to twice their pre-sweep depth.
+The first step is quick, the last is slow, and the middle one does most of the visible work: the
+best quote regains 63\% (BTC) and 53\% (ETH) of its pre-sweep depth within 40\,ms.
 
-\paragraph{Contribution.} \citet{bonart2017latency} show that net order flow at the best
-quotes passes through distinct phases after a market order: a fast net outflow at the
-same-side best quote followed by ``stimulated refill''. Our first and third phases are the
-multi-level counterparts of these. Relative to their work and to resilience studies at the
-best quotes
-\citep{large2007resiliency,xu2017resiliency,clapham2021speed} and aggregate impulse responses
-\citep{lo2015resiliency}, we provide a depth-profile mass balance that separates withdrawal,
-depth-conserving repositioning and net new liquidity, and we time each phase at 20\,ms
-resolution. Relative to the quote-fade evidence of \citet{MalinovaPark2016}, we show that fades
-extend through the book and are followed by systematic repositioning before new liquidity
-arrives. Relative to continuum models, our evidence favours non-local and source terms over a
-local diffusion term at sub-second horizons on small-tick books, and shows that whether a
-displacement looks local depends on the tick grid; fractional and non-local order-book models exist in
-theory and simulation \citep{benzaquen2018fractional,diana2024anomalous}, and we provide
-empirical support for that class. Relative to queue-reactive and Hawkes models of order flow
-\citep{huang2015queue,bacry2015hawkes}, we show that post-sweep flows depend on time since the
-shock rather than on queue sizes, and that a linear-Hawkes response reproduces their two time
-scales. Finally, we show that the phases matter for execution (the
-excess cost of a follow-up order is mostly gone within 250\,ms, before new liquidity arrives),
-and we use a public order-level feed from a second venue to show that cancel-and-repost moves
-are a routine part of near-touch liquidity supply.
+Level-2 data do not identify individual orders, so ``moved'' depth is an inference from
+cancellations and additions that match in size and timing. Two checks support it. On Bybit,
+exact-size matches between deep cancellations and near additions are rare, but the 20\,ms
+messages net out most of them. On Bitstamp, whose public feed shows every order with its own
+identifier, more than a quarter of the volume added near the touch over almost six days is an order
+cancelled deeper in the book and re-posted with the identical amount. There such moves are
+routine, and no more frequent after sweeps than at other times.
+
+The three steps survive the obvious alternatives. They hold for every definition of the deep
+book, matching method, sweep size, sweep side and time of day we try. A three-phase rate model
+predicts flows on held-out days far better than the exponential recovery of resilience models,
+and local diffusion adds nothing. A model in which flows depend only on current queue sizes
+fails: right after a sweep, deep orders are cancelled faster, and near orders added faster, than
+at an ordinary moment with equally thin queues. What drives refill is the time since the sweep.
+Nor is refill mainly a reaction to information: the early steps look nearly the same whether or
+not the price later moves on in the sweep's direction.
+
+We then ask how general the pattern is, across seven books on three exchanges. Withdrawal and
+the late arrival of new liquidity appear on all of them. The fast move to the new price does
+not. It appears on the four books whose tick is small relative to the price (Bybit BTC and ETH,
+and the Binance and OKX Bitcoin perpetuals), where most moved liquidity travels less than one or
+two basis points. How much of it we can see depends on how often the exchange publishes the book:
+OKX's 10\,ms feed shows as much as Bybit's 20\,ms feed, Binance's 52\,ms feed shows much less,
+and bundling the OKX and Bybit messages into 52\,ms batches brings them close to Binance. Our
+estimates are therefore lower bounds. On the three books with large ticks (SOL, XRP and LINK),
+repositioning is absent or too fine for the tick grid to resolve, and the extra cost of trading
+again decays far more slowly.
+
+A simple mechanism fits this pattern. When the tick is large relative to the price, queues at
+each price are long and an early place in the queue is valuable. Cancelling an order to re-post
+it at the new price throws that place away. When the tick is small, queues are short and moving
+costs little. Consistent with this, near-touch orders on the large-tick books are cancelled two
+to six times more slowly even at ordinary times. This comparison is across assets, which differ
+in other ways too, so we read it as supporting evidence rather than proof.
+
+\paragraph{Contribution.} \citet{bonart2017latency} show that, after a market order in Nasdaq
+stocks, net order flow at the best quotes first flows out and then refills; our first and third
+steps are the book-wide counterparts of these phases. What is new is the middle step, and the
+accounting that reveals it: a mass balance over the whole depth profile, timed at 20\,ms, that
+tells moved depth apart from new depth. Studies of resilience
+\citep{large2007resiliency,xu2017resiliency,clapham2021speed,lo2015resiliency} measure how fast
+liquidity returns, not where it comes from. For continuum models, our results favour non-local
+terms over local diffusion on small-tick books, in line with fractional and non-local models
+proposed in theory \citep{benzaquen2018fractional,diana2024anomalous}, and show that whether a
+move looks local depends on the tick grid. For order-flow models
+\citep{huang2015queue,bacry2015hawkes}, flows after a sweep depend on the time since the shock
+rather than on queue sizes, and a linear Hawkes response reproduces their two time scales. For
+traders, the middle step matters most: the price for small orders recovers by moving existing
+liquidity, well before new liquidity arrives.
+
+Section~\ref{sec:lit} reviews related work. Sections~\ref{sec:data}--\ref{sec:method} describe
+the data and method, Section~\ref{sec:results} presents the three steps, and
+Section~\ref{sec:pde} draws out the implications for continuum models. Section~\ref{sec:robust}
+reports robustness checks, Section~\ref{sec:general} extends the analysis to other assets and
+venues, Section~\ref{sec:limits} discusses limitations, and the last section concludes.
 
 %----------------------------------------------------------------------------------------------
 \section{Related literature}
+\label{sec:lit}
 
 \paragraph{Resilience.} Empirical work on order book resilience measures how fast spreads and
 depth recover after aggressive orders. \citet{large2007resiliency} estimates a
@@ -216,6 +216,7 @@ feasible without order identifiers.
 
 %----------------------------------------------------------------------------------------------
 \section{Data}
+\label{sec:data}
 
 \paragraph{Source.} Tardis.dev publishes the first day of every month of its historical
 datasets without charge \citep{tardis}. We use Bybit linear (USDT-margined) perpetual futures,
@@ -247,6 +248,7 @@ swept levels empty at the first post-sweep book message.}
 
 %----------------------------------------------------------------------------------------------
 \section{Method}
+\label{sec:method}
 
 \subsection{Sweeps}
 We group trades sharing an exchange timestamp and aggressor side into \emph{aggressor runs}. A
