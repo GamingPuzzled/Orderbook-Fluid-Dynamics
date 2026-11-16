@@ -6,6 +6,14 @@ Excess (sweep − NN placebo) masses, fractions of pre-sweep swept depth, 95% da
 
 | feed | levels cleared | sweeps | repositioning <250 | withdrawal <250 | new liq. >250 |
 |---|---|---|---|---|---|
+| OKX, 10 ms feed | all | 10741 | 0.175 [0.141, 0.206] | 0.145 [0.084, 0.233] | 0.249 [0.171, 0.338] |
+| OKX, 10 ms feed | 3-40 | 3625 | 0.044 [0.020, 0.073] | 0.088 [0.041, 0.151] | 0.260 [0.145, 0.366] |
+| OKX, 10 ms feed | 40-80 | 2585 | 0.094 [0.067, 0.120] | 0.095 [0.044, 0.163] | 0.198 [0.093, 0.262] |
+| OKX, 10 ms feed | 80-+ | 4526 | 0.354 [0.236, 0.502] | 0.234 [0.149, 0.319] | 0.258 [0.161, 0.371] |
+| OKX, emulated 52 ms | all | 10741 | 0.041 [0.028, 0.047] | 0.148 [0.080, 0.219] | 0.224 [0.107, 0.301] |
+| OKX, emulated 52 ms | 3-40 | 3625 | 0.018 [0.003, 0.035] | 0.178 [0.129, 0.224] | 0.216 [0.100, 0.292] |
+| OKX, emulated 52 ms | 40-80 | 2585 | 0.029 [0.011, 0.036] | 0.144 [0.072, 0.213] | 0.161 [0.061, 0.242] |
+| OKX, emulated 52 ms | 80-+ | 4526 | 0.061 [0.033, 0.092] | 0.169 [0.089, 0.233] | 0.239 [0.104, 0.331] |
 | Bybit, 20 ms feed | all | 25406 | 0.173 [0.148, 0.198] | 0.218 [0.176, 0.254] | 0.193 [0.161, 0.215] |
 | Bybit, 20 ms feed | 3-40 | 7243 | 0.072 [0.057, 0.098] | 0.176 [0.132, 0.215] | 0.174 [0.134, 0.198] |
 | Bybit, 20 ms feed | 40-80 | 6356 | 0.131 [0.101, 0.151] | 0.211 [0.169, 0.245] | 0.164 [0.135, 0.190] |
@@ -19,9 +27,19 @@ Excess (sweep − NN placebo) masses, fractions of pre-sweep swept depth, 95% da
 | Binance, 52 ms feed | 40-80 | 1756 | 0.043 [0.010, 0.099] | 0.150 [0.052, 0.255] | 0.159 [0.072, 0.291] |
 | Binance, 52 ms feed | 80-+ | 1838 | 0.113 [0.044, 0.214] | 0.167 [0.105, 0.278] | 0.362 [0.178, 0.574] |
 
-## Feed-speed curve (Bybit BTCUSDT, all sweeps)
 
-| netting (ms) | placebo add/cancel | repositioning <250 | repositioning total | share of 20 ms (<250) | share of 20 ms (total) |
+## Feed-speed curve (okex-swap BTC, all sweeps; shares relative to the fastest feed)
+
+| netting (ms) | placebo add/cancel | repositioning <250 | repositioning total | share (<250) | share (total) |
+|---|---|---|---|---|---|
+| 10 | 1.018 | 0.175 [0.141, 0.206] | 0.407 [0.205, 0.633] | 1.00 | 1.00 |
+| 20 | 1.023 | 0.102 [0.080, 0.121] | 0.233 [0.108, 0.392] | 0.58 | 0.57 |
+| 52 | 1.032 | 0.041 [0.028, 0.047] | 0.068 [0.031, 0.177] | 0.23 | 0.17 |
+| 100 | 1.041 | 0.006 [0.000, 0.016] | 0.007 [0.000, 0.076] | 0.03 | 0.02 |
+
+## Feed-speed curve (bybit BTC, all sweeps; shares relative to the fastest feed)
+
+| netting (ms) | placebo add/cancel | repositioning <250 | repositioning total | share (<250) | share (total) |
 |---|---|---|---|---|---|
 | 20 | 1.029 | 0.173 [0.148, 0.198] | 0.267 [0.223, 0.333] | 1.00 | 1.00 |
 | 52 | 1.043 | 0.065 [0.052, 0.078] | 0.084 [0.072, 0.099] | 0.38 | 0.31 |

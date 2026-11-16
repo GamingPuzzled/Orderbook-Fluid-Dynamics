@@ -544,6 +544,7 @@ def build_parser() -> argparse.ArgumentParser:
     hz.add_argument(
         "--assets",
         default="bybit:BTCUSDT:20,bybit:ETHUSDT:20,binance-futures:BTCUSDT:60,"
+        "okex-swap:BTC-USDT-SWAP:110,"
         "bybit:SOLUSDT:20,bybit:XRPUSDT:20,bybit:LINKUSDT:20",
         help="comma-separated exchange:symbol:max_push_ms",
     )

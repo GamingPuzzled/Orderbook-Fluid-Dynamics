@@ -328,7 +328,7 @@ def hazard(out: Path) -> None:
     f = Path("results/pooled/hazard.parquet")
     if not f.exists():
         return
-    venues = {"bybit": "Bybit", "binance-futures": "Binance"}
+    venues = {"bybit": "Bybit", "binance-futures": "Binance", "okex-swap": "OKX"}
     rows = [
         f"{venues.get(r['exchange'], r['exchange'])} & {r['symbol']} & {r['days']} & "
         f"{r['cancel_rate']:.2f} {{\\scriptsize[{r['lo']:.2f}, {r['hi']:.2f}]}} \\\\"

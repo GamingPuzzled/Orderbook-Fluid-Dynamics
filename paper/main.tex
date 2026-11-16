@@ -34,11 +34,13 @@ liquidity, centred at roughly 0.4--0.8\,s. A three-phase rate model and a linear
 response predict the flows on held-out days; exponential recovery and a queue-reactive
 benchmark, in which flows depend only on the book's state, do not; local diffusion adds no
 predictive power; and the phases are nearly the same whether or not the price later continues
-in the sweep's direction. Across six books, withdrawal and the delayed arrival of new
-liquidity are general, but repositioning is not: on the Binance BTC perpetual, whose tick is as
-small as Bybit's, it is as strong as on Bybit once feed speed and sweep size are matched, and is absent on SOL and finer than the tick grid on XRP and LINK, the
-three large-tick books (most repositioned BTC and ETH liquidity moves less than 1--2 basis
-points). On the Bybit BTC and ETH books, the excess
+in the sweep's direction. Across seven books on three venues, withdrawal and the delayed arrival
+of new liquidity are general, but repositioning is not. It appears on all four small-tick books,
+including the OKX and Binance BTC perpetuals, with a measured size that depends on how often the
+venue publishes the book: OKX's 10\,ms feed shows as much as Bybit's 20\,ms feed, and bundling
+either into 52\,ms messages brings both close to Binance's 52\,ms feed. It is absent on SOL and
+finer than the tick grid on XRP and LINK, the three large-tick books (most repositioned BTC and
+ETH liquidity moves less than 1--2 basis points). On the Bybit BTC and ETH books, the excess
 cost of a follow-up market order falls by about 90\% within 250\,ms; on the large-tick books
 most of it remains.
 \end{abstract}
@@ -108,8 +110,11 @@ same whether or not the price later continues in the sweep's direction
 (Section~\ref{sec:info}): refill is a reaction to the sweep itself, timed from it, not a
 response to the book's state or to the sweep's information content. Withdrawal and the
 delayed source also appear on three thinner Bybit books with large ticks (SOL, XRP, LINK) and
-on the Binance BTC perpetual, but repositioning appears only on the small-tick books (on Binance BTC
-it looks weaker, but a slower feed and smaller sweeps account for most of the gap). On BTC and ETH most moved liquidity travels less than 1--2\,bp, which
+on the Binance and OKX BTC perpetuals, but repositioning appears only on the small-tick books.
+Its measured size depends on how often the venue publishes the book: on OKX's 10\,ms feed it is
+as large as on Bybit's 20\,ms feed, Binance's 52\,ms feed shows much less, and bundling the OKX
+and Bybit messages into 52\,ms batches brings both close to Binance. On BTC and ETH most moved
+liquidity travels less than 1--2\,bp, which
 on XRP and LINK lies inside the near zone; on SOL, where the grid is fine enough to see such
 moves, repositioning is an order of magnitude smaller; and on the large-tick books the excess
 execution cost decays far more slowly (Section~\ref{sec:robust}). This fits a queue-priority
@@ -159,8 +164,9 @@ streams on the exchange clock rather than on receipt time.
 October 2026 (BTCUSDT) and November 2026 (ETHUSDT). Table~\ref{tab:sample} summarises it.
 For replication (Section~\ref{sec:robust}) we add the Bybit SOLUSDT, XRPUSDT and LINKUSDT
 perpetuals on the same first-of-month days and with the same feed filter (31, 21 and 25 days
-with matched placebo times), and the Binance BTCUSDT perpetual (twelve quarterly days;
-its feed publishes the full book every 52\,ms, see Section~\ref{sec:robust}).
+with matched placebo times), and the Binance BTCUSDT and OKX BTC-USDT-SWAP perpetuals on the same
+twelve quarterly days (Binance's feed publishes about 1{,}000 levels every 52\,ms, OKX's
+tick-by-tick feed 400 levels every 10\,ms; see Section~\ref{sec:robust}).
 
 \begin{table}[ht]
 \centering
@@ -700,48 +706,56 @@ fast recovery of execution cost, is therefore a feature of the deep, small-tick 
 books; withdrawal, early net depletion and a delayed source of new liquidity are common to
 all five.
 
-\paragraph{Another venue.} The Binance BTCUSDT perpetual has nearly the same relative tick as
-Bybit BTCUSDT (0.013 against 0.014\,bp) but a different participant base, so it separates the
-tick from the venue. Its free Tardis feed publishes about 1{,}000 levels every 52\,ms; we
-replay the full book but classify changes only within the best 50 levels per side, as on Bybit
-(deep levels of the full-depth feed go stale, which otherwise appears as spurious additions;
-with the restriction, added $\div$ cancelled at placebo times is 1.07). Over twelve quarterly
-days (5{,}958 sweeps; the 52\,ms push interval blurs the first two windows), withdrawal, early
-net depletion and the late source replicate: $\kappa = 0.69$ ($[0.56, 0.83]$) at 20--40\,ms
-and 1.18 at 250--1000\,ms, withdrawal before 250\,ms is 0.13 of pre-sweep depth, and new
-liquidity after 250\,ms 0.24. Repositioning is present but much weaker than on Bybit: 0.038
-($[0.007, 0.083]$), about a fifth of Bybit's 0.17, and, as on Bybit, it vanishes once the near
-zone is widened to 50 ticks (0.006 at 0.6\,bp). Consistently, the follow-up execution excess
-decays more slowly than on Bybit (33\% of its 20\,ms value left at 250\,ms, against 13\%).
-Parametric models predict held-out Binance days poorly (cross-validated $R^2$ at most 0.32 for
-every model), so the model comparison is uninformative on this feed.
+\paragraph{Other venues.} The Binance BTCUSDT and OKX BTC-USDT-SWAP perpetuals have nearly the
+same relative tick as Bybit BTCUSDT (0.013 against 0.014\,bp) but different participants, so
+they separate the tick from the venue. They also differ in how often the book is published,
+which turns out to matter: Binance's free Tardis feed publishes about 1{,}000 levels every
+52\,ms, and OKX's tick-by-tick feed 400 levels every 10\,ms. On both we replay the full book but
+classify changes only within the best 50 levels per side, as on Bybit (deep levels of a
+full-depth feed go stale, which otherwise appears as spurious additions; with the restriction,
+added $\div$ cancelled at placebo times is 1.07 on Binance and 1.02 on OKX). Each venue
+contributes twelve quarterly days (5{,}958 and 10{,}741 sweeps).
 
-Most of the gap to Bybit is measurement. Each Binance message nets all changes over 52\,ms,
-and each change is placed relative to the opposite quote before the message, so a move that
-falls in the same message as the sweep, or as the quote change it follows, is recorded as
-deep-book churn rather than as a move to the touch. To measure this, we re-run Bybit BTCUSDT
-with its messages netted into 52, 100 and 200\,ms buckets on a fixed clock, published at the
-end of each bucket. Measured repositioning falls from 0.17 at 20\,ms to 0.065
-($[0.052, 0.078]$) at 52\,ms, 0.011 ($[0.005, 0.017]$) at 100\,ms and zero at 200\,ms, while
-added $\div$ cancelled at placebo times stays between 1.03 and 1.06, so the flow accounting
-remains intact and only the move becomes invisible. Binance sweeps
-also clear fewer levels (median 52 against 73), and on both venues larger sweeps trigger more
-repositioning. Within the same range of levels cleared and at the same feed speed, the two
-venues are close (Table~\ref{tab:feedspeed}): 0.058 against 0.043 for sweeps clearing 40--80
-levels and 0.097 against 0.113 for more than 80, with overlapping intervals; only the smallest
-sweeps differ (0.028 against 0.002). Fast repositioning is therefore as strong on Binance BTC as
-on Bybit BTC once feed speed and sweep size are matched, and absent or unresolvable on the
-large-tick books. The emulation also shows that coarse messages hide moves, so the Bybit
-repositioning masses measured at 20\,ms are lower bounds: at 52, 100 and 200\,ms of netting,
-38\%, 6\% and none of the 20\,ms value remains. It also makes a prediction for feeds slower
-than Binance's: a venue that publishes every 100\,ms should show almost no repositioning
-with this method, whatever its true size.
+Withdrawal and the late source replicate on both. On Binance, $\kappa = 0.69$ ($[0.56, 0.83]$)
+at 20--40\,ms and 1.18 at 250--1000\,ms, withdrawal before 250\,ms is 0.13 of pre-sweep depth,
+and new liquidity after 250\,ms 0.24 (the 52\,ms push interval blurs the first two windows).
+On OKX the early net depletion is milder and later ($\kappa = 0.89$, $[0.80, 1.01]$, at
+20--40\,ms and 0.86, $[0.77, 0.95]$, at 40--100\,ms; 1.09 at 250--1000\,ms), withdrawal before
+250\,ms is 0.15 and new liquidity 0.25. Repositioning differs sharply: 0.175 ($[0.143, 0.203]$)
+on OKX, as on Bybit, but 0.038 ($[0.007, 0.083]$) on Binance. On both, as on Bybit, it shrinks
+once the near zone is widened to 50 ticks (0.05 on OKX and 0.006 on Binance, at 0.6\,bp). The
+follow-up execution excess decays as fast on OKX as on Bybit (5\% of its 20\,ms value left at
+250\,ms) and more slowly on Binance (33\%). Parametric models fit these venues less well than
+Bybit. On OKX the three-phase models and the linear-Hawkes response again beat exponential
+recovery and the queue-reactive benchmark (cross-validated $R^2$ 0.51--0.60, against 0.18 and
+0.04); on Binance every model predicts held-out days poorly ($R^2$ at most 0.32).
+
+The gap in repositioning between the venues is mostly measurement. Each message nets all
+changes over the publication interval, and each change is placed relative to the opposite
+quote before the message, so a move that falls in the same message as the sweep, or as the
+quote change it follows, is recorded as deep-book churn rather than as a move to the touch. To
+measure this, we re-run OKX and Bybit with their messages netted into slower buckets on a fixed
+clock, published at the end of each bucket (Table~\ref{tab:feedspeed}). Measured repositioning
+on OKX falls from 0.175 at 10\,ms to 0.102 at 20\,ms, 0.041 at 52\,ms and 0.006 at 100\,ms; on
+Bybit from 0.173 at 20\,ms to 0.065 at 52\,ms, 0.011 at 100\,ms and zero at 200\,ms. Added
+$\div$ cancelled at placebo times stays between 1.02 and 1.06 throughout, so the flow
+accounting remains intact and only the move becomes invisible. At a common publication interval
+the venues are close but not identical: at 20\,ms, 0.10 on OKX against 0.17 on Bybit; at
+52\,ms, 0.041 on OKX, 0.038 on Binance and 0.065 on Bybit. On every venue larger sweeps trigger
+more repositioning, and at 52\,ms the venues are also close within ranges of levels cleared
+(for more than 80 levels: 0.061, 0.113 and 0.097, with overlapping intervals). Fast
+repositioning is therefore a feature of all four small-tick books, of similar size on the three
+BTC venues once feed speed is matched, and absent or unresolvable on the large-tick books. The
+emulation also shows that the measured masses are lower bounds: going from a 20 to a 10\,ms
+publication interval on OKX raises measured repositioning by about 70\%, so the true moves are
+probably larger than any of our feeds show, and a venue that publishes every 100\,ms would show
+almost none with this method.
 
 \begin{table}[ht]
 \centering
 \caption{Feed speed and repositioning. Excess repositioning before 250\,ms by levels cleared,
-for Bybit BTCUSDT at its 20\,ms feed, Bybit BTCUSDT with messages netted into 52\,ms buckets,
-and Binance BTCUSDT (52\,ms feed). NN placebo; 95\% day-cluster intervals.}
+for each BTC venue at its own feed (OKX 10\,ms, Bybit 20\,ms, Binance 52\,ms) and for OKX and
+Bybit with messages netted into 52\,ms buckets. NN placebo; 95\% day-cluster intervals.}
 \label{tab:feedspeed}
 \input{tables/feedspeed.tex}
 \end{table}
@@ -755,7 +769,7 @@ priority up. On a small-tick book queues are short and priority is cheap, so mov
 toward the new price costs little. This predicts that resting near-touch depth turns over
 more slowly on large-tick books even in normal times, and it does (Table~\ref{tab:hazard}):
 at placebo times, near-touch depth is cancelled at 0.20--0.33 of its size per second on SOL,
-XRP and LINK, against 0.66--1.14 on the three small-tick books. The comparison is across
+XRP and LINK, against 0.66--1.14 on the four small-tick books. The comparison is across
 assets, which also differ in depth and participants, and within-asset variation in the
 relative tick does not identify the effect, so this is evidence consistent with the
 queue-priority explanation rather than a test that isolates it.
@@ -798,7 +812,8 @@ local minus the common model (Section~\ref{sec:pde}). Exec.\ left: follow-up exc
 \caption{The three-phase refill by book, ordered by relative tick size: early net depletion,
 excess repositioning before 250\,ms (fraction of pre-sweep swept-side depth; CEM placebo, as
 in Table~\ref{tab:phases}), and the timing of the three phases (95\% day-cluster intervals).
-Repositioning is large only on the three small-tick books.}
+Repositioning is clearly positive only on the four small-tick books; Binance's 52\,ms feed hides
+most of it there.}
 \label{fig:cross}
 \end{figure}
 
@@ -809,17 +824,20 @@ Repositioning is large only on the three small-tick books.}
         moves supply about a quarter of near-touch added volume, but that sample is short
         (7.2 hours, 166 sweeps), on a spot venue, and its placebo matching is imperfect
         (standardised differences up to 0.25).
-  \item \textbf{Push netting.} Each 20\,ms message nets changes at a price, so gross flows are
-        lower bounds. Netting Bybit BTC messages into 52 and 100\,ms buckets removes 62\% and 94\%
-        of measured repositioning, so part of it is probably lost at 20\,ms as well, and the
-        method cannot measure repositioning on feeds of 100\,ms or slower.
+  \item \textbf{Push netting.} Each message nets changes over its publication interval, so
+        gross flows, and repositioning in particular, are lower bounds. On OKX, netting its
+        10\,ms messages into 20, 52 and 100\,ms buckets removes 42\%, 77\% and 97\% of measured
+        repositioning; on Bybit, 52 and 100\,ms remove 62\% and 94\%. Part of it is therefore
+        lost even at 20\,ms, and the method cannot measure repositioning on feeds of 100\,ms or
+        slower.
   \item \textbf{Fill matching.} About one third of sweep volume exceeds the displayed size at
         its price (hidden or newly posted liquidity); matchable volume is capped at displayed
         size so it cannot absorb later cancellations.
-  \item \textbf{Venues and assets.} Two derivatives venues, both on free first-of-month days.
+  \item \textbf{Venues and assets.} Three derivatives venues, all on free first-of-month days.
         On Bybit the full three-phase structure holds for the two deepest books; on three thinner, large-tick books repositioning is
-        either absent (SOL) or finer than the tick grid can resolve (XRP, LINK). Binance has
-        only twelve days and a 52\,ms feed, on which parametric models fit poorly.
+        either absent (SOL) or finer than the tick grid can resolve (XRP, LINK). Binance and OKX
+        contribute twelve days each, and on Binance's 52\,ms feed parametric models fit
+        poorly.
 \end{itemize}
 
 %----------------------------------------------------------------------------------------------
@@ -827,9 +845,9 @@ Repositioning is large only on the three small-tick books.}
 After a multi-level sweep, the deep Bitcoin and Ether perpetual order books refill in three
 phases: within the first $\sim$100\,ms liquidity is pulled and moved to the new price, and
 only after 0.4--0.8\,s is it made anew. Pulling first and making anew later is common to all
-six books we study. The fast move to the new price is not: it appears only on the three books
-whose tick is small relative to price (on Binance once its slower feed is accounted for), and not on the
-three large-tick books,
+seven books we study, on three venues. The fast move to the new price is not: it appears on the
+four books whose tick is small relative to price, on every venue once feed speed is accounted
+for, and not on the three large-tick books,
 where the cost of trading again also stays high for longer. Near-touch orders on the
 large-tick books turn over more slowly even in normal times, which fits the view that a place
 in a long queue is too valuable to give up by moving. The sequencing
@@ -846,7 +864,8 @@ arrives.
 \section*{Data and code availability}
 The level-2 order book and trade data are the free first-of-month files published by Tardis.dev
 \citep{tardis} for Bybit linear perpetual futures (BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT,
-LINKUSDT) and the Binance USDT-margined BTCUSDT perpetual; they are not
+LINKUSDT), the Binance USDT-margined BTCUSDT perpetual and the OKX BTC-USDT-SWAP perpetual; they
+are not
 redistributed, but the code downloads them. The Bitstamp order-level data were recorded from
 Bitstamp's public websocket feed (\texttt{live\_orders\_btcusd}, \texttt{live\_trades\_btcusd}) and
 REST order book snapshots, which require no account. All code, the derived results from which

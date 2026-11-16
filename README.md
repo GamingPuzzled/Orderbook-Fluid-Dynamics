@@ -56,9 +56,11 @@ uv run lobflow information --exchange $EX --symbol $SYM         # refill by post
 uv run lobflow zonewidth --exchange $EX --symbol $SYM           # repositioning by near-zone width
 uv run lobflow ticksize                                          # within-asset tick regression (pooled)
 uv run lobflow hazard                                            # near-touch cancel rate at placebo times
-uv run lobflow flows --exchange bybit --symbol BTCUSDT --tag flowscoarse52 --coarsen-ms 52 \
-  --edges 0,20,40,60,80,100,140,200,300,450,650,1000 && uv run python scripts/feedspeed.py
-                                                                 # emulate Binance's 52 ms feed
+for c in 52 100 200; do uv run lobflow flows --exchange bybit --symbol BTCUSDT --tag flowscoarse$c \
+  --coarsen-ms $c --edges 0,20,40,60,80,100,140,200,300,450,650,1000; done   # emulate slower feeds
+for c in 20 52 100; do uv run lobflow flows --exchange okex-swap --symbol BTC-USDT-SWAP \
+  --tag flowscoarse$c --coarsen-ms $c --max-push-ms 110 --edges 0,20,40,60,80,100,140,200,300,450,650,1000; done
+uv run python scripts/feedspeed.py                               # feed-speed comparison (pooled)
 ```
 
 Bitstamp order-level replication (frozen sample used in the paper):
